@@ -1,0 +1,196 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Aaradhya Pharmaceuticals - Order Form</title>
+  <link href="https://fonts.googleapis.com/css2?family=Roboto&display=swap" rel="stylesheet">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+  <style>
+    body {
+      font-family: 'Roboto', sans-serif;
+      background-color: #f0f4f8;
+      color: #333;
+      margin: 0;
+      padding: 2rem;
+    }
+    .container {
+      max-width: 800px;
+      margin: auto;
+      background: white;
+      padding: 2rem;
+      border-radius: 10px;
+      box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+    }
+    h1 {
+      color: #0a5275;
+      text-align: center;
+    }
+    label, select, input {
+      display: block;
+      width: 100%;
+      margin-bottom: 1rem;
+    }
+    select, input {
+      padding: 0.5rem;
+      border: 1px solid #ccc;
+      border-radius: 5px;
+    }
+    button {
+      padding: 0.7rem 1.5rem;
+      margin-right: 1rem;
+      border: none;
+      border-radius: 5px;
+      background-color: #0a5275;
+      color: white;
+      cursor: pointer;
+    }
+    table {
+      width: 100%;
+      margin-top: 1rem;
+      border-collapse: collapse;
+    }
+    th, td {
+      padding: 0.5rem;
+      border: 1px solid #ccc;
+      text-align: center;
+    }
+    .btn-container {
+      text-align: center;
+      margin-top: 1.5rem;
+    }
+  </style>
+</head>
+<body>
+<div class="container">
+  <h1>Aaradhya Pharmaceuticals - Order Form</h1>
+  <label for="customerName">Customer Name</label>
+  <input type="text" id="customerName" placeholder="Enter your name" />
+
+  <label for="companySelect">Company</label>
+  <select id="companySelect"></select>
+
+  <label for="productSelect">Product</label>
+  <select id="productSelect"></select>
+
+  <button onclick="addItem()">Add to Order</button>
+
+  <table id="orderTable">
+    <thead>
+    <tr>
+      <th>Company</th>
+      <th>Product</th>
+      <th>MRP</th>
+      <th>Rate</th>
+      <th>Quantity</th>
+      <th>Action</th>
+    </tr>
+    </thead>
+    <tbody></tbody>
+  </table>
+
+  <div class="btn-container">
+    <button onclick="downloadPDF()">Download PDF</button>
+    <button onclick="sendWhatsApp()">Order via WhatsApp</button>
+  </div>
+</div>
+
+<script>
+  let productData = [];
+  let orderItems = [];
+
+  async function fetchSheetData() {
+    const sheetUrl = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vTC1IC1n6PIhZC5CltBOC1hGmPP_cCjS8z6-vbnkeVuRC8NGUuO1R_TOnhO7CIG3e5Y7vD7EX9D_dtc/pub?output=csv';
+    const response = await fetch(sheetUrl);
+    const data = await response.text();
+    const rows = data.trim().split('\n').map(row => row.split(',').map(cell => cell.trim()));  // Trim each cell
+    const headers = rows[0].map(h => h.toLowerCase());
+
+    const companyIndex = headers.indexOf('company');
+    const productIndex = headers.indexOf('product');
+    const mrpIndex = headers.indexOf('mrp');
+    const rateIndex = headers.indexOf('rate');
+
+    productData = rows.slice(1).map(cols => ({
+      company: cols[companyIndex]?.trim(),
+      product: cols[productIndex]?.trim(),
+      mrp: cols[mrpIndex]?.trim(),
+      rate: cols[rateIndex]?.trim(),
+    })).filter(p => p.company && p.product);
+
+    const companies = [...new Set(productData.map(p => p.company))];
+    const companySelect = document.getElementById('companySelect');
+    companySelect.innerHTML = companies.map(c => `<option value="${c}">${c}</option>`).join('');
+    companySelect.addEventListener('change', populateProducts);
+    populateProducts();
+  }
+
+  function populateProducts() {
+    const selectedCompany = document.getElementById('companySelect').value;
+    const products = productData.filter(p => p.company === selectedCompany);
+    const productSelect = document.getElementById('productSelect');
+    productSelect.innerHTML = products.map(p => `<option value="${p.product}">${p.product}</option>`).join('');
+  }
+
+  function addItem() {
+    const company = document.getElementById('companySelect').value;
+    const product = document.getElementById('productSelect').value;
+    const item = productData.find(p => p.company === company && p.product === product);
+    if (!item) return;
+    item.quantity = 1;
+    orderItems.push(item);
+    renderOrderTable();
+  }
+
+  function removeItem(index) {
+    orderItems.splice(index, 1);
+    renderOrderTable();
+  }
+
+  function updateQuantity(index, value) {
+    const qty = parseInt(value);
+    orderItems[index].quantity = isNaN(qty) || qty < 1 ? 1 : qty;
+  }
+
+  function renderOrderTable() {
+    const tbody = document.querySelector('#orderTable tbody');
+    tbody.innerHTML = orderItems.map((item, index) =>
+      `<tr>
+        <td>${item.company}</td>
+        <td>${item.product}</td>
+        <td>${item.mrp}</td>
+        <td>${item.rate}</td>
+        <td><input type="number" min="1" value="${item.quantity}" onchange="updateQuantity(${index}, this.value)" style="width: 60px;"/></td>
+        <td><button onclick="removeItem(${index})">Remove</button></td>
+      </tr>`
+    ).join('');
+  }
+
+  function downloadPDF() {
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF();
+    doc.setFontSize(12);
+    doc.text("Aaradhya Pharmaceuticals - Order Summary", 10, 10);
+    doc.text(`Customer: ${document.getElementById('customerName').value}`, 10, 20);
+    let y = 30;
+    orderItems.forEach((item, i) => {
+      doc.text(`${i + 1}. ${item.company} - ${item.product} | MRP: ${item.mrp} | Rate: ${item.rate} | Qty: ${item.quantity}`, 10, y);
+      y += 10;
+    });
+    doc.save("OrderSummary.pdf");
+  }
+
+  function sendWhatsApp() {
+    const name = document.getElementById('customerName').value;
+    let message = `Aaradhya Pharma Order - Customer: ${name}%0A`;
+    orderItems.forEach((item, i) => {
+      message += `${i + 1}. ${item.company} - ${item.product}, MRP: ${item.mrp}, Rate: ${item.rate}, Qty: ${item.quantity}%0A`;
+    });
+    const phone = "YOUR_WHATSAPP_NUMBER"; // Replace with your WhatsApp number
+    window.open(`https://wa.me/${phone}?text=${message}`, '_blank');
+  }
+
+  fetchSheetData();
+</script>
+</body>
+</html>
