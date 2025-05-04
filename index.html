@@ -6,9 +6,7 @@
   <title>Aaradhya Pharmaceuticals - Order Form</title>
   <link href="https://fonts.googleapis.com/css2?family=Roboto&display=swap" rel="stylesheet">
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.25/jspdf.plugin.autotable.min.js"></script>
-
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.28/jspdf.plugin.autotable.min.js"></script>
   <style>
     body {
       font-family: 'Roboto', sans-serif;
@@ -103,7 +101,7 @@
   let orderItems = [];
 
   async function fetchSheetData() {
-    const sheetUrl = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vTncdMIHDQMrGOHNG1OtTshlMudqiF4TP40IlfkqRE_3nTgYhtlABmeRUH1uZ6VP08vkfrw6nk8jkLx/pub?output=csv';
+    const sheetUrl = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vTC1IC1n6PIhZC5CltBOC1hGmPP_cCjS8z6-vbnkeVuRC8NGUuO1R_TOnhO7CIG3e5Y7vD7EX9D_dtc/pub?output=csv';
     const response = await fetch(sheetUrl);
     const data = await response.text();
     const rows = data.trim().split('\n').map(row => row.split(','));
@@ -141,7 +139,7 @@
     const item = productData.find(p => p.company === company && p.product === product);
     if (!item) return;
     item.quantity = 1;
-    orderItems.push(item);
+    orderItems.push({ ...item });
     renderOrderTable();
   }
 
@@ -169,63 +167,51 @@
     ).join('');
   }
 
- // function downloadPDF() {
- //   const { jsPDF } = window.jspdf;
-//    const doc = new jsPDF();
-//    doc.setFontSize(12);
- //   doc.text("Aaradhya Pharmaceuticals - Order Summary", 10, 10);
-//    doc.text(`Customer: ${document.getElementById('customerName').value}`, 10, 20);
- //   let y = 30;
- //   orderItems.forEach((item, i) => {
-  //    doc.text(`${i + 1}. ${item.company} - ${item.product} | MRP: ${item.mrp} | Rate: ${item.rate} | Qty: ${item.quantity}`, 10, y);
-  //    y += 10;
- //   });
-//    doc.save("OrderSummary.pdf");
-//  }
-function downloadPDF() {
-  const { jsPDF } = window.jspdf;
-  const doc = new jsPDF();
-  doc.setFontSize(12);
-  doc.text("Aaradhya Pharmaceuticals - Order Summary", 10, 10);
-  doc.text(`Customer: ${document.getElementById('customerName').value}`, 10, 20);
+  function downloadPDF() {
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF();
+    doc.setFontSize(12);
+    doc.text("Aaradhya Pharmaceuticals - Order Summary", 10, 10);
+    doc.text(`Customer: ${document.getElementById('customerName').value}`, 10, 20);
 
-  const headers = ["S.No", "Company", "Product", "MRP", "Rate", "Qty", "Cost"];
-  const rows = [];
-  let total = 0;
+    const headers = [["S.No", "Company", "Product", "MRP", "Rate", "Qty", "Cost"]];
+    const rows = [];
+    let total = 0;
 
-  orderItems.forEach((item, i) => {
-    const rate = parseFloat(item.rate) || 0;
-    const qty = parseInt(item.quantity) || 1;
-    const cost = rate * qty;
-    total += cost;
-    rows.push([
-      i + 1,
-      item.company,
-      item.product,
-      item.mrp,
-      rate.toFixed(2),
-      qty,
-      cost.toFixed(2)
-    ]);
-  });
+    orderItems.forEach((item, i) => {
+      const cost = parseFloat(item.rate) * item.quantity;
+      total += cost;
+      rows.push([
+        i + 1,
+        item.company,
+        item.product,
+        item.mrp,
+        item.rate,
+        item.quantity,
+        cost.toFixed(2)
+      ]);
+    });
 
-  doc.autoTable({
-    head: [headers],
-    body: rows,
-    startY: 30
-  });
+    doc.autoTable({
+      head: headers,
+      body: rows,
+      startY: 30
+    });
 
-  doc.text(`Total: ₹${total.toFixed(2)}`, 10, doc.lastAutoTable.finalY + 10);
-  doc.save("OrderSummary.pdf");
-}
+    doc.text(`Total: ₹${total.toFixed(2)}`, 10, doc.lastAutoTable.finalY + 10);
+    doc.save("OrderSummary.pdf");
+  }
 
   function sendWhatsApp() {
     const name = document.getElementById('customerName').value;
     let message = `Aaradhya Pharma Order - Customer: ${name}%0A`;
     orderItems.forEach((item, i) => {
-      message += `${i + 1}. ${item.company} - ${item.product}, MRP: ${item.mrp}, Rate: ${item.rate}, Qty: ${item.quantity}%0A`;
+      const cost = parseFloat(item.rate) * item.quantity;
+      message += `${i + 1}. ${item.company} - ${item.product}, MRP: ${item.mrp}, Rate: ${item.rate}, Qty: ${item.quantity}, Cost: ₹${cost.toFixed(2)}%0A`;
     });
-    const phone = "919999999999"; // Replace with your WhatsApp number
+    const total = orderItems.reduce((sum, item) => sum + (parseFloat(item.rate) * item.quantity), 0);
+    message += `Total Cost: ₹${total.toFixed(2)}`;
+    const phone = "YOUR_WHATSAPP_NUMBER";
     window.open(`https://wa.me/${phone}?text=${message}`, '_blank');
   }
 
