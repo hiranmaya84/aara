@@ -101,7 +101,9 @@
   let orderItems = [];
 
   async function fetchSheetData() {
-    const sheetUrl = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vTC1IC1n6PIhZC5CltBOC1hGmPP_cCjS8z6-vbnkeVuRC8NGUuO1R_TOnhO7CIG3e5Y7vD7EX9D_dtc/pub?output=csv';
+  //  const sheetUrl = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vTC1IC1n6PIhZC5CltBOC1hGmPP_cCjS8z6-vbnkeVuRC8NGUuO1R_TOnhO7CIG3e5Y7vD7EX9D_dtc/pub?output=csv';
+  const sheetUrl = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vTncdMIHDQMrGOHNG1OtTshlMudqiF4TP40IlfkqRE_3nTgYhtlABmeRUH1uZ6VP08vkfrw6nk8jkLx/pub?output=csv';
+
     const response = await fetch(sheetUrl);
     const data = await response.text();
     const rows = data.trim().split('\n').map(row => row.split(','));
