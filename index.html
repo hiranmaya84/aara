@@ -1,202 +1,381 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Product List - AAradhya Pharmaceuticals</title>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
-  <style>
-    body {
-      font-family: Arial, sans-serif;
-      padding: 20px;
-      background-color: #f4f4f4;
-    }
-    h1 {
-      text-align: center;
-    }
-    table {
-      width: 100%;
-      border-collapse: collapse;
-      background-color: white;
-      margin-bottom: 20px;
-    }
-    th, td {
-      border: 1px solid #ccc;
-      padding: 10px;
-      text-align: left;
-    }
-    th {
-      background-color: #e91e63;
-      color: white;
-    }
-    tr:nth-child(even) {
-      background-color: #f9f9f9;
-    }
-    #searchInput, #shopName {
-      width: 100%;
-      padding: 10px;
-      margin-bottom: 10px;
-      font-size: 16px;
-    }
-    .count-input {
-      width: 60px;
-    }
-    button {
-      padding: 10px;
-      margin-top: 10px;
-      font-size: 16px;
-      cursor: pointer;
-    }
-  </style>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AAradhya Pharma - Order App</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+    <style>
+        :root { --primary: #2563eb; --bg: #f8fafc; --text: #0f172a; --border: #e2e8f0; }
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: var(--bg); color: var(--text); margin: 0; padding-bottom: 100px; }
+        
+        /* Header */
+        header { background: var(--primary); color: white; padding: 1rem; text-align: center; position: sticky; top: 0; z-index: 100; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1); }
+        
+        .container { max-width: 800px; margin: 0 auto; padding: 10px; }
+        
+        /* Status Bar */
+        #status { background: #fff3cd; color: #856404; padding: 10px; text-align: center; font-size: 0.9rem; margin-bottom: 10px; border-radius: 6px; display: none; }
+        #status.success { background: #dcfce7; color: #166534; }
+        #status.error { background: #fee2e2; color: #991b1b; }
+
+        /* Controls */
+        .controls { background: white; padding: 15px; border-radius: 12px; box-shadow: 0 1px 3px rgba(0,0,0,0.05); margin-bottom: 15px; display: grid; gap: 10px; }
+        input, select { width: 100%; padding: 12px; border: 1px solid #cbd5e1; border-radius: 8px; box-sizing: border-box; font-size: 1rem; }
+
+        /* Product List */
+        .product-card { background: white; padding: 15px; border-radius: 10px; margin-bottom: 10px; display: flex; justify-content: space-between; align-items: center; border: 1px solid var(--border); box-shadow: 0 1px 2px rgba(0,0,0,0.05); }
+        .p-info h3 { margin: 0 0 5px 0; font-size: 1rem; color: #1e293b; }
+        .p-meta { font-size: 0.85rem; color: #64748b; }
+        .p-price { font-weight: bold; color: var(--primary); margin-top: 5px; }
+        
+        /* Qty Controls */
+        .qty-box { display: flex; align-items: center; gap: 8px; background: #f1f5f9; padding: 4px; border-radius: 20px; }
+        .q-btn { width: 32px; height: 32px; border-radius: 50%; border: none; background: white; color: var(--primary); font-size: 1.2rem; cursor: pointer; box-shadow: 0 1px 2px rgba(0,0,0,0.1); display: flex; align-items: center; justify-content: center; }
+        .q-btn:active { transform: scale(0.95); }
+        .q-val { font-weight: 600; min-width: 24px; text-align: center; }
+
+        /* Cart Footer */
+        .cart-bar { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); width: 90%; max-width: 600px; background: #1e293b; color: white; padding: 12px 24px; border-radius: 50px; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 10px 25px rgba(0,0,0,0.25); z-index: 999; display: none; cursor: pointer; }
+        .cart-btn { background: #10b981; border: none; padding: 8px 20px; border-radius: 20px; color: white; font-weight: bold; cursor: pointer; font-size: 1rem; }
+
+        /* Order Modal */
+        #orderModal { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: white; z-index: 2000; overflow-y: auto; display: none; }
+        .invoice { max-width: 800px; margin: auto; padding: 20px; }
+        
+        /* Customer Form */
+        .cust-form { background: #f8fafc; padding: 15px; border-radius: 8px; border: 1px solid #e2e8f0; margin-bottom: 20px; display: grid; gap: 10px; }
+        .cust-form input { border: 1px solid #cbd5e1; }
+        
+        /* Invoice Table */
+        table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+        th, td { text-align: left; padding: 12px 8px; border-bottom: 1px solid #e2e8f0; }
+        th { background: #f8fafc; color: #64748b; font-size: 0.85rem; text-transform: uppercase; }
+        .text-right { text-align: right; }
+        .total-row td { font-weight: bold; font-size: 1.1rem; border-top: 2px solid #cbd5e1; }
+        
+        /* Footer Message */
+        .legal-footer { margin-top: 30px; text-align: center; color: #94a3b8; font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.5px; border-top: 1px solid #e2e8f0; padding-top: 15px; }
+
+        /* Buttons */
+        .action-bar { margin-top: 20px; display: flex; gap: 10px; justify-content: center; }
+        .btn-lg { padding: 12px 24px; border-radius: 8px; border: none; font-weight: bold; cursor: pointer; color: white; font-size: 1rem; flex: 1; max-width: 200px; }
+        
+        /* --- PRINT SETTINGS (STRICT) --- */
+        @media print { 
+            /* Hide EVERYTHING by default */
+            body > * { display: none !important; }
+            
+            /* Only Show the Order Modal */
+            #orderModal { 
+                display: block !important; 
+                position: absolute; 
+                top: 0; 
+                left: 0; 
+                width: 100%; 
+                margin: 0; 
+                padding: 0; 
+                background: white; 
+                height: auto; 
+                overflow: visible; 
+            }
+            
+            /* Ensure Invoice content is visible */
+            #orderModal .invoice {
+                width: 100%;
+                max-width: 100%;
+                margin: 0;
+                padding: 10px;
+            }
+
+            /* Hide specific internal elements marked no-print */
+            .no-print { display: none !important; }
+        }
+    </style>
 </head>
 <body>
-  <h1>AAradhya Pharmaceuticals</h1>
-  <input type="text" id="shopName" placeholder="Enter Shop Name">
-  <input type="text" id="searchInput" placeholder="Search for company or product...">
 
-  <table id="productTable">
-    <thead>
-      <tr>
-        <th>Company</th>
-        <th>Product</th>
-        <th>MRP (₹)</th>
-        <th>Rate (₹)</th>
-        <th>Count</th>
-        <th>Add</th>
-      </tr>
-    </thead>
-    <tbody></tbody>
-  </table>
+<header class="no-print">
+    <h3>💊 AAradhya Order App</h3>
+</header>
 
-  <button onclick="downloadPDF()">Download Order PDF</button>
-  <button onclick="sendWhatsAppOrder()">Send Order via WhatsApp</button>
+<div class="container" id="mainApp">
+    <div id="status">Connecting...</div>
 
-  <script>
-    const csvUrl = "https://docs.google.com/spreadsheets/d/e/2PACX-1vTncdMIHDQMrGOHNG1OtTshlMudqiF4TP40IlfkqRE_3nTgYhtlABmeRUH1uZ6VP08vkfrw6nk8jkLx/pub?output=csv";
-    let order = [];
+    <div class="controls no-print">
+        <input type="text" id="search" placeholder="🔍 Search medicine..." onkeyup="filterItems()">
+        <select id="compSelect" onchange="filterItems()">
+            <option value="ALL">Loading Companies...</option>
+        </select>
+    </div>
 
-    async function fetchCSV(url) {
-      const response = await fetch(url);
-      const data = await response.text();
-      return data;
+    <div id="list"></div>
+</div>
+
+<div id="cartBar" class="cart-bar no-print" onclick="openOrder()">
+    <div>
+        <span style="font-size:0.8rem; opacity:0.8">Total Items: <span id="cartCount">0</span></span><br>
+        <b style="font-size:1.1rem">₹<span id="cTotal">0.00</span></b>
+    </div>
+    <button class="cart-btn">View Order</button>
+</div>
+
+<div id="orderModal">
+    <div class="invoice">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px;">
+            <h2 style="margin:0; color:var(--primary);">Order Summary</h2>
+            <button onclick="document.getElementById('orderModal').style.display='none'" class="no-print" style="font-size:2rem; background:none; border:none; cursor:pointer; color:#64748b;">&times;</button>
+        </div>
+
+        <div class="cust-form no-print">
+            <h4 style="margin:0 0 5px 0;">Customer Details</h4>
+            <input type="text" id="cName" placeholder="Enter Name *" required>
+            <input type="number" id="cMobile" placeholder="Enter Mobile Number *" required>
+        </div>
+
+        <div id="printInfo">
+            <p><strong>Name:</strong> <span id="dispName" style="color:#64748b;">(Not Entered)</span></p>
+            <p><strong>Mobile:</strong> <span id="dispMobile" style="color:#64748b;">(Not Entered)</span></p>
+            <p><strong>Date:</strong> <span id="oDate"></span></p>
+        </div>
+
+        <table>
+            <thead><tr><th>Item</th><th class="text-right">Qty</th><th class="text-right">Value</th></tr></thead>
+            <tbody id="oBody"></tbody>
+            <tfoot>
+                <tr>
+                    <td colspan="2" class="text-right" style="padding-top:15px;">Subtotal:</td>
+                    <td class="text-right" style="padding-top:15px;">₹<span id="subTotal">0.00</span></td>
+                </tr>
+                <tr>
+                    <td colspan="2" class="text-right">GST (5%):</td>
+                    <td class="text-right">₹<span id="gstVal">0.00</span></td>
+                </tr>
+                <tr class="total-row">
+                    <td colspan="2" class="text-right">Grand Total:</td>
+                    <td class="text-right" style="color:var(--primary);">₹<span id="grandTotal">0.00</span></td>
+                </tr>
+            </tfoot>
+        </table>
+
+        <div class="legal-footer">
+            This order form is designed for AAradhya Pharmaceuticals by AAradhya Pharmaceuticals to be used by staff and customers of AAradhya Pharmaceuticals.
+        </div>
+
+        <div class="action-bar no-print">
+            <button class="btn-lg" style="background:#2563eb;" onclick="printOrder()">🖨️ Print / PDF</button>
+            <button class="btn-lg" style="background:#25D366;" onclick="shareWA()">📱 WhatsApp</button>
+        </div>
+    </div>
+</div>
+
+<script>
+    // --- SETTINGS ---
+    const SHEET_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQQWE4gE40MJrObusTZARsQ3mOkyQAK-djFktAEL0zgnj5sawV0hMeCgRhoDHX3JA/pub?output=csv";
+    const PROXIES = ["https://api.allorigins.win/raw?url=", "https://corsproxy.io/?", "https://thingproxy.freeboard.io/fetch/"];
+
+    let db = [];
+    let cart = {};
+
+    function log(msg, type="info") {
+        const el = document.getElementById('status');
+        el.innerText = msg;
+        el.className = type;
+        el.style.display = 'block';
     }
 
-    function parseCSV(data) {
-      const rows = data.trim().split("\n").slice(1);
-      return rows.map(row => {
-        const [company, product, mrp, rate] = row.split(',');
-        return { company, product, mrp, rate };
-      });
+    // --- 1. DATA LOADING ---
+    async function init() {
+        log("⏳ Loading stock...");
+        let csvText = null;
+        for (let proxy of PROXIES) {
+            try {
+                const res = await fetch(proxy + encodeURIComponent(SHEET_URL));
+                if (res.ok) {
+                    csvText = await res.text();
+                    if(csvText.includes("company") || csvText.includes("item")) break;
+                }
+            } catch (e) {}
+        }
+
+        if (!csvText) return log("❌ Failed to load. Check internet.", "error");
+
+        Papa.parse(csvText, {
+            header: true, skipEmptyLines: true,
+            complete: function(results) {
+                const uniqueMap = new Map();
+                results.data.forEach(row => {
+                    const get = (k) => row[Object.keys(row).find(key => key.toLowerCase().includes(k))];
+                    const name = get("item") || get("name");
+                    const comp = get("company") || "General";
+                    const rate = parseFloat((get("rate") || "0").replace(/[^\d.]/g,''));
+                    const stock = (get("stock") || "").toString();
+
+                    if (name && rate > 0) {
+                        const id = name + "|" + comp;
+                        if (!uniqueMap.has(id)) uniqueMap.set(id, { id, name, company: comp, rate, stock });
+                    }
+                });
+                db = Array.from(uniqueMap.values());
+                log(`✅ Ready (${db.length} items)`, "success");
+                populateCompanies();
+                renderList(db.slice(0, 50));
+            }
+        });
     }
 
-    function renderTable(products) {
-      const tbody = document.querySelector("#productTable tbody");
-      tbody.innerHTML = "";
-      products.forEach((item, index) => {
-        const row = document.createElement("tr");
-        row.innerHTML = `
-          <td>${item.company}</td>
-          <td>${item.product}</td>
-          <td>${item.mrp}</td>
-          <td>${item.rate}</td>
-          <td><input type='number' id='count-${index}' class='count-input' min='0' value='0'></td>
-          <td><button onclick='addToOrder(${index})'>Add</button></td>
-        `;
-        tbody.appendChild(row);
-      });
+    // --- 2. UI FUNCTIONS ---
+    function populateCompanies() {
+        const comps = [...new Set(db.map(i => i.company))].sort();
+        const sel = document.getElementById('compSelect');
+        sel.innerHTML = '<option value="ALL">-- All Companies --</option>';
+        comps.forEach(c => {
+            if(c) {
+                const opt = document.createElement('option');
+                opt.value = c;
+                opt.innerText = c;
+                sel.appendChild(opt);
+            }
+        });
     }
 
-    function filterTable(products) {
-      const query = document.getElementById("searchInput").value.toLowerCase();
-      const filtered = products.filter(p =>
-        p.company.toLowerCase().includes(query) ||
-        p.product.toLowerCase().includes(query)
-      );
-      renderTable(filtered);
+    function filterItems() {
+        const txt = document.getElementById('search').value.toLowerCase();
+        const comp = document.getElementById('compSelect').value;
+        const filtered = db.filter(i => {
+            return i.name.toLowerCase().includes(txt) && (comp === "ALL" || i.company === comp);
+        });
+        renderList(filtered.slice(0, txt ? 500 : 50));
     }
 
-    function addToOrder(index) {
-      const count = parseInt(document.getElementById(`count-${index}`).value);
-      if (count > 0) {
-        const row = document.querySelectorAll("#productTable tbody tr")[index];
-        const cells = row.querySelectorAll("td");
-        const item = {
-          company: cells[0].innerText,
-          product: cells[1].innerText,
-          mrp: cells[2].innerText,
-          rate: parseFloat(cells[3].innerText),
-          count: count,
-          cost: (parseFloat(cells[3].innerText) * count).toFixed(2)
-        };
-        order.push(item);
-        alert(`${item.product} added to order.`);
-      }
+    function renderList(items) {
+        const div = document.getElementById('list');
+        div.innerHTML = '';
+        if(items.length===0) return div.innerHTML = '<div style="text-align:center; padding:20px;">No items found</div>';
+
+        const frag = document.createDocumentFragment();
+        items.forEach(i => {
+            const q = cart[i.id] || 0;
+            const el = document.createElement('div');
+            el.className = 'product-card';
+            el.innerHTML = `
+                <div class="p-info">
+                    <h3>${i.name}</h3>
+                    <div class="p-meta">${i.company} ${i.stock ? '| Stock: '+i.stock : ''}</div>
+                    <div class="p-price">₹${i.rate.toFixed(2)}</div>
+                </div>
+                <div class="qty-box">
+                    <button class="q-btn" onclick="upd('${i.id}', -1)">-</button>
+                    <div class="q-val" id="q_${cleanId(i.id)}">${q}</div>
+                    <button class="q-btn" onclick="upd('${i.id}', 1)">+</button>
+                </div>
+            `;
+            frag.appendChild(el);
+        });
+        div.appendChild(frag);
     }
 
-    function toWords(num) {
-      const a = ["", "One", "Two", "Three", "Four", "Five", "Six", "Seven", "Eight", "Nine", "Ten", "Eleven", "Twelve", "Thirteen", "Fourteen", "Fifteen", "Sixteen", "Seventeen", "Eighteen", "Nineteen"];
-      const b = ["", "", "Twenty", "Thirty", "Forty", "Fifty", "Sixty", "Seventy", "Eighty", "Ninety"];
+    function cleanId(id) { return id.replace(/[^a-zA-Z0-9]/g, ''); }
 
-      if ((num = num.toString()).length > 9) return "Overflow";
-      let n = ("000000000" + num).substr(-9).match(/.{1,3}/g);
-      let str = "";
-      if (parseInt(n[0])) str += a[Number(n[0])] + " Crore ";
-      if (parseInt(n[1])) str += a[Number(n[1])] + " Lakh ";
-      if (parseInt(n[2])) str += a[Number(n[2])] + " Thousand ";
-      if (parseInt(n[3])) str += a[Number(n[3])] + " Hundred ";
-      if (parseInt(n[4])) str += ((str != "") ? "and " : "") + (a[Number(n[4])] || b[n[4][0]] + " " + a[n[4][1]]) + " ";
-      return str.trim();
+    // --- 3. CART & ORDER LOGIC ---
+    window.upd = (id, d) => {
+        if (!cart[id]) cart[id] = 0;
+        cart[id] += d;
+        if (cart[id] <= 0) delete cart[id];
+        const el = document.getElementById('q_' + cleanId(id));
+        if (el) el.innerText = cart[id] || 0;
+        calcTotal();
+    };
+
+    function calcTotal() {
+        let total = 0, count = 0;
+        for (let id in cart) {
+            const item = db.find(x => x.id === id);
+            if (item) { total += item.rate * cart[id]; count++; }
+        }
+        document.getElementById('cTotal').innerText = total.toFixed(2);
+        document.getElementById('cartCount').innerText = count;
+        document.getElementById('cartBar').style.display = count > 0 ? 'flex' : 'none';
     }
 
-    function downloadPDF() {
-      if (order.length === 0) {
-        alert("No items in order to download.");
-        return;
-      }
-      const jsPDF = window.jspdf.jsPDF;
-      const doc = new jsPDF();
-      const shopName = document.getElementById("shopName").value || "Unknown Shop";
-      doc.text(`Shop Name: ${shopName}`, 10, 10);
-      doc.text(`Stockist: AAradhya Pharmaceuticals`, 10, 20);
+    window.openOrder = () => {
+        // Sync Inputs to Display text (live update)
+        document.getElementById('cName').addEventListener('input', updatePrintDetails);
+        document.getElementById('cMobile').addEventListener('input', updatePrintDetails);
+        
+        renderOrderTable();
+        document.getElementById('orderModal').style.display = 'block';
+    };
 
-      let y = 30;
-      doc.autoTable({
-        startY: y,
-        head: [["Company", "Product", "MRP", "Rate", "Qty", "Cost"]],
-        body: order.map(item => [item.company, item.product, item.mrp, item.rate, item.count, item.cost])
-      });
-
-      const total = order.reduce((sum, item) => sum + parseFloat(item.cost), 0);
-      y = doc.lastAutoTable.finalY + 10;
-      doc.text(`Total Cost: ₹${total.toFixed(2)}`, 10, y);
-      y += 10;
-      doc.text(`Total in Words: ${toWords(total.toFixed(0))} Rupees Only`, 10, y);
-
-      doc.save("order.pdf");
+    function updatePrintDetails() {
+        const n = document.getElementById('cName').value;
+        const m = document.getElementById('cMobile').value;
+        document.getElementById('dispName').innerText = n || "(Not Entered)";
+        document.getElementById('dispMobile').innerText = m || "(Not Entered)";
     }
 
-    function sendWhatsAppOrder() {
-      const shopName = document.getElementById("shopName").value || "Unknown Shop";
-      let message = `*Order from ${shopName}*\nStockist: AAradhya Pharmaceuticals\n\n`;
-      let total = 0;
+    function renderOrderTable() {
+        const body = document.getElementById('oBody');
+        body.innerHTML = '';
+        let subtotal = 0;
 
-      order.forEach((item, i) => {
-        message += `${i+1}. ${item.product} (${item.company}) - Rate: ₹${item.rate}, Qty: ${item.count}, Cost: ₹${item.cost}\n`;
-        total += parseFloat(item.cost);
-      });
+        for (let id in cart) {
+            const item = db.find(x => x.id === id);
+            const val = item.rate * cart[id];
+            subtotal += val;
+            body.innerHTML += `
+                <tr>
+                    <td>${item.name}<br><small>${item.company}</small></td>
+                    <td class="text-right">${cart[id]}</td>
+                    <td class="text-right">₹${val.toFixed(2)}</td>
+                </tr>
+            `;
+        }
 
-      message += `\n*Total: ₹${total.toFixed(2)}*\nTotal in Words: ${toWords(total.toFixed(0))} Rupees Only`;
-      const encoded = encodeURIComponent(message);
-      const whatsappURL = `https://wa.me/?text=${encoded}`;
-      window.open(whatsappURL, '_blank');
+        const gst = subtotal * 0.05;
+        const total = subtotal + gst;
+
+        document.getElementById('subTotal').innerText = subtotal.toFixed(2);
+        document.getElementById('gstVal').innerText = gst.toFixed(2);
+        document.getElementById('grandTotal').innerText = total.toFixed(2);
+        document.getElementById('oDate').innerText = new Date().toLocaleString();
     }
 
-    window.addEventListener("DOMContentLoaded", async () => {
-      const csvData = await fetchCSV(csvUrl);
-      const products = parseCSV(csvData);
-      renderTable(products);
-      document.getElementById("searchInput").addEventListener("input", () => filterTable(products));
-    });
-  </script>
+    window.printOrder = () => {
+        const name = document.getElementById('cName').value;
+        if(!name) return alert("Please enter Customer Name first.");
+        updatePrintDetails();
+        window.print();
+    };
+
+    window.shareWA = () => {
+        const name = document.getElementById('cName').value;
+        const mobile = document.getElementById('cMobile').value;
+        if(!name) return alert("Please enter Customer Name first.");
+
+        let text = `*ORDER - AARADHYA PHARMACEUTICALS*\n`;
+        text += `👤 Name: ${name}\n📞 Mobile: ${mobile}\n`;
+        text += `📅 Date: ${new Date().toLocaleDateString()}\n\n`;
+        
+        for (let id in cart) {
+            const item = db.find(x => x.id === id);
+            text += `${cart[id]} x ${item.name} (${item.rate})\n`;
+        }
+
+        const sub = document.getElementById('subTotal').innerText;
+        const gst = document.getElementById('gstVal').innerText;
+        const grand = document.getElementById('grandTotal').innerText;
+
+        text += `\nSubtotal: ₹${sub}`;
+        text += `\nGST (5%): ₹${gst}`;
+        text += `\n*GRAND TOTAL: ₹${grand}*`;
+        
+        text += `\n\n_This order form is designed for AAradhya Pharmaceuticals by AAradhya Pharmaceuticals_`;
+
+        window.open("https://wa.me/?text=" + encodeURIComponent(text));
+    };
+
+    init();
+</script>
 </body>
 </html>
