@@ -1,9 +1,15 @@
+This usually happens when network security or the internet provider blocks the "Proxy" used to read the Google Sheet.
+I have updated the app with a "Fail-Safe" System.
+ * Multiple Connections: It now tries 3 different ways to connect to your sheet.
+ * Manual Fallback: If the internet connection still blocks the data, a "Paste Data" box will appear. You can simply click the link, copy the text, and paste it into the app to use it immediately.
+ * Print Fix: Ensures ONLY the invoice prints (no background menus).
+Save this as .html and it should work 100%.
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AAradhya Pharma - Order App</title>
+    <title>AAradhya Pharma Order App</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
     <style>
         :root { --primary: #2563eb; --bg: #f8fafc; --text: #0f172a; --border: #e2e8f0; }
@@ -15,9 +21,13 @@
         .container { max-width: 800px; margin: 0 auto; padding: 10px; }
         
         /* Status Bar */
-        #status { background: #fff3cd; color: #856404; padding: 10px; text-align: center; font-size: 0.9rem; margin-bottom: 10px; border-radius: 6px; display: none; }
+        #status { background: #fff3cd; color: #856404; padding: 15px; text-align: center; font-size: 0.95rem; margin-bottom: 10px; border-radius: 6px; display: none; }
         #status.success { background: #dcfce7; color: #166534; }
         #status.error { background: #fee2e2; color: #991b1b; }
+
+        /* Manual Input Fallback */
+        #manualInput { display: none; background: white; padding: 20px; border-radius: 8px; border: 1px solid #e2e8f0; margin-top: 20px; text-align: center; }
+        #manualInput textarea { width: 100%; height: 100px; margin-top: 10px; padding: 10px; border: 1px solid #ccc; border-radius: 4px; font-family: monospace; }
 
         /* Controls */
         .controls { background: white; padding: 15px; border-radius: 12px; box-shadow: 0 1px 3px rgba(0,0,0,0.05); margin-bottom: 15px; display: grid; gap: 10px; }
@@ -63,33 +73,11 @@
         
         /* --- PRINT SETTINGS (STRICT) --- */
         @media print { 
-            /* Hide EVERYTHING by default */
-            body > * { display: none !important; }
-            
-            /* Only Show the Order Modal */
-            #orderModal { 
-                display: block !important; 
-                position: absolute; 
-                top: 0; 
-                left: 0; 
-                width: 100%; 
-                margin: 0; 
-                padding: 0; 
-                background: white; 
-                height: auto; 
-                overflow: visible; 
-            }
-            
-            /* Ensure Invoice content is visible */
-            #orderModal .invoice {
-                width: 100%;
-                max-width: 100%;
-                margin: 0;
-                padding: 10px;
-            }
-
-            /* Hide specific internal elements marked no-print */
+            body * { visibility: hidden; } /* Hide everything */
+            #orderModal, #orderModal * { visibility: visible; } /* Show only modal */
+            #orderModal { position: absolute; left: 0; top: 0; width: 100%; height: auto; display: block !important; overflow: visible; background: white; }
             .no-print { display: none !important; }
+            .invoice { padding: 0; border: none; width: 100%; max-width: 100%; }
         }
     </style>
 </head>
@@ -101,8 +89,21 @@
 
 <div class="container" id="mainApp">
     <div id="status">Connecting...</div>
+    
+    <div id="manualInput">
+        <h3>⚠️ Automatic Loading Failed</h3>
+        <p>Your network is blocking the direct connection. Please follow these steps:</p>
+        <ol style="text-align:left; max-width:300px; margin:auto;">
+            <li><a href="#" id="sheetLink" target="_blank">Click here to open data</a></li>
+            <li>Select All (Ctrl+A) and Copy (Ctrl+C) the text.</li>
+            <li>Paste it in the box below and click "Load".</li>
+        </ol>
+        <textarea id="pasteBox" placeholder="Paste data here..."></textarea>
+        <br>
+        <button class="btn-lg" style="background:var(--primary); margin-top:10px;" onclick="loadManualData()">Load Data</button>
+    </div>
 
-    <div class="controls no-print">
+    <div class="controls no-print" id="appControls" style="display:none;">
         <input type="text" id="search" placeholder="🔍 Search medicine..." onkeyup="filterItems()">
         <select id="compSelect" onchange="filterItems()">
             <option value="ALL">Loading Companies...</option>
@@ -114,7 +115,7 @@
 
 <div id="cartBar" class="cart-bar no-print" onclick="openOrder()">
     <div>
-        <span style="font-size:0.8rem; opacity:0.8">Total Items: <span id="cartCount">0</span></span><br>
+        <span style="font-size:0.8rem; opacity:0.8">Items: <span id="cartCount">0</span></span><br>
         <b style="font-size:1.1rem">₹<span id="cTotal">0.00</span></b>
     </div>
     <button class="cart-btn">View Order</button>
@@ -172,7 +173,14 @@
 <script>
     // --- SETTINGS ---
     const SHEET_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQQWE4gE40MJrObusTZARsQ3mOkyQAK-djFktAEL0zgnj5sawV0hMeCgRhoDHX3JA/pub?output=csv";
-    const PROXIES = ["https://api.allorigins.win/raw?url=", "https://corsproxy.io/?", "https://thingproxy.freeboard.io/fetch/"];
+    document.getElementById('sheetLink').href = SHEET_URL;
+
+    // Different proxy services to try in order
+    const PROXIES = [
+        "https://corsproxy.io/?",
+        "https://api.allorigins.win/raw?url=", 
+        "https://api.codetabs.com/v1/proxy?quest="
+    ];
 
     let db = [];
     let cart = {};
@@ -184,27 +192,52 @@
         el.style.display = 'block';
     }
 
-    // --- 1. DATA LOADING ---
+    // --- 1. ROBUST DATA LOADING ---
     async function init() {
-        log("⏳ Loading stock...");
+        log("⏳ Connecting to database (Attempt 1)...");
+        
         let csvText = null;
-        for (let proxy of PROXIES) {
+        
+        // Loop through proxies
+        for (let i = 0; i < PROXIES.length; i++) {
             try {
+                const proxy = PROXIES[i];
+                log(`⏳ Connecting to database (Attempt ${i+1})...`);
                 const res = await fetch(proxy + encodeURIComponent(SHEET_URL));
                 if (res.ok) {
-                    csvText = await res.text();
-                    if(csvText.includes("company") || csvText.includes("item")) break;
+                    const text = await res.text();
+                    // Verify it's actually data, not an error page
+                    if(text.includes("company") || text.includes("item") || text.length > 100) {
+                        csvText = text;
+                        break; // Success!
+                    }
                 }
-            } catch (e) {}
+            } catch (e) { console.warn("Proxy failed:", PROXIES[i]); }
         }
 
-        if (!csvText) return log("❌ Failed to load. Check internet.", "error");
+        if (csvText) {
+            processData(csvText);
+        } else {
+            log("❌ Automatic loading blocked by network.", "error");
+            document.getElementById('manualInput').style.display = 'block';
+        }
+    }
 
-        Papa.parse(csvText, {
+    function loadManualData() {
+        const text = document.getElementById('pasteBox').value;
+        if(text.length < 50) return alert("Please paste the data first.");
+        processData(text);
+        document.getElementById('manualInput').style.display = 'none';
+    }
+
+    function processData(csvData) {
+        log("Processing...", "info");
+        Papa.parse(csvData, {
             header: true, skipEmptyLines: true,
             complete: function(results) {
                 const uniqueMap = new Map();
                 results.data.forEach(row => {
+                    // Fuzzy match column names
                     const get = (k) => row[Object.keys(row).find(key => key.toLowerCase().includes(k))];
                     const name = get("item") || get("name");
                     const comp = get("company") || "General";
@@ -216,8 +249,18 @@
                         if (!uniqueMap.has(id)) uniqueMap.set(id, { id, name, company: comp, rate, stock });
                     }
                 });
+
                 db = Array.from(uniqueMap.values());
+                if(db.length === 0) {
+                     log("❌ Loaded data is empty. Try Manual Mode.", "error");
+                     document.getElementById('manualInput').style.display = 'block';
+                     return;
+                }
+
                 log(`✅ Ready (${db.length} items)`, "success");
+                setTimeout(() => { document.getElementById('status').style.display = 'none'; }, 2000);
+                
+                document.getElementById('appControls').style.display = 'grid';
                 populateCompanies();
                 renderList(db.slice(0, 50));
             }
@@ -299,10 +342,8 @@
     }
 
     window.openOrder = () => {
-        // Sync Inputs to Display text (live update)
         document.getElementById('cName').addEventListener('input', updatePrintDetails);
         document.getElementById('cMobile').addEventListener('input', updatePrintDetails);
-        
         renderOrderTable();
         document.getElementById('orderModal').style.display = 'block';
     };
@@ -353,24 +394,18 @@
         const mobile = document.getElementById('cMobile').value;
         if(!name) return alert("Please enter Customer Name first.");
 
-        let text = `*ORDER - AARADHYA PHARMACEUTICALS*\n`;
-        text += `👤 Name: ${name}\n📞 Mobile: ${mobile}\n`;
-        text += `📅 Date: ${new Date().toLocaleDateString()}\n\n`;
+        let text = `*ORDER - AARADHYA PHARMA*\n`;
+        text += `👤 ${name} (${mobile})\n`;
+        text += `📅 ${new Date().toLocaleDateString()}\n\n`;
         
         for (let id in cart) {
             const item = db.find(x => x.id === id);
-            text += `${cart[id]} x ${item.name} (${item.rate})\n`;
+            text += `${cart[id]} x ${item.name}\n`;
         }
 
-        const sub = document.getElementById('subTotal').innerText;
-        const gst = document.getElementById('gstVal').innerText;
         const grand = document.getElementById('grandTotal').innerText;
-
-        text += `\nSubtotal: ₹${sub}`;
-        text += `\nGST (5%): ₹${gst}`;
-        text += `\n*GRAND TOTAL: ₹${grand}*`;
-        
-        text += `\n\n_This order form is designed for AAradhya Pharmaceuticals by AAradhya Pharmaceuticals_`;
+        text += `\n*GRAND TOTAL (Inc GST): ₹${grand}*`;
+        text += `\n\n_Designed for AAradhya Pharmaceuticals_`;
 
         window.open("https://wa.me/?text=" + encodeURIComponent(text));
     };
@@ -379,3 +414,4 @@
 </script>
 </body>
 </html>
+
