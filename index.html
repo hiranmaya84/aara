@@ -45,18 +45,31 @@
 
         /* Order Modal */
         #orderModal { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: white; z-index: 2000; overflow-y: auto; display: none; }
-        .invoice { max-width: 800px; margin: auto; padding: 20px; }
+        .invoice { max-width: 800px; margin: auto; padding: 20px; background: white; min-height: 100vh; }
         
         /* Customer Form */
         .cust-form { background: #f8fafc; padding: 15px; border-radius: 8px; border: 1px solid #e2e8f0; margin-bottom: 20px; display: grid; gap: 10px; }
         .cust-form input { border: 1px solid #cbd5e1; }
         
         /* Invoice Table */
-        table { width: 100%; border-collapse: collapse; margin-top: 10px; }
-        th, td { text-align: left; padding: 12px 8px; border-bottom: 1px solid #e2e8f0; }
-        th { background: #f8fafc; color: #64748b; font-size: 0.85rem; text-transform: uppercase; }
+        table { width: 100%; border-collapse: collapse; margin-top: 10px; margin-bottom: 20px; }
+        th, td { text-align: left; padding: 8px; border-bottom: 1px solid #e2e8f0; font-size: 0.9rem; }
+        th { background: #f8fafc; color: #64748b; font-size: 0.85rem; text-transform: uppercase; border-bottom: 2px solid #e2e8f0; }
         .text-right { text-align: right; }
-        .total-row td { font-weight: bold; font-size: 1.1rem; border-top: 2px solid #cbd5e1; }
+        
+        /* Summary Block (The Fix) */
+        .summary-block { 
+            width: 100%; 
+            max-width: 300px; 
+            margin-left: auto; 
+            background: #f8fafc; 
+            padding: 15px; 
+            border-radius: 8px; 
+            border: 1px solid #e2e8f0; 
+            page-break-inside: avoid; /* Prevents splitting on print */
+        }
+        .summary-row { display: flex; justify-content: space-between; margin-bottom: 8px; font-size: 0.95rem; }
+        .summary-row.total { border-top: 2px solid #cbd5e1; padding-top: 8px; font-weight: bold; font-size: 1.1rem; color: var(--primary); }
         
         /* Footer Message */
         .legal-footer { margin-top: 30px; text-align: center; color: #94a3b8; font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.5px; border-top: 1px solid #e2e8f0; padding-top: 15px; }
@@ -65,13 +78,22 @@
         .action-bar { margin-top: 20px; display: flex; gap: 10px; justify-content: center; }
         .btn-lg { padding: 12px 24px; border-radius: 8px; border: none; font-weight: bold; cursor: pointer; color: white; font-size: 1rem; flex: 1; max-width: 200px; }
         
-        /* --- PRINT SETTINGS (STRICT) --- */
+        /* --- PRINT SETTINGS --- */
         @media print { 
             body * { visibility: hidden; } /* Hide everything */
             #orderModal, #orderModal * { visibility: visible; } /* Show only modal */
             #orderModal { position: absolute; left: 0; top: 0; width: 100%; height: auto; display: block !important; overflow: visible; background: white; }
             .no-print { display: none !important; }
-            .invoice { padding: 0; border: none; width: 100%; max-width: 100%; }
+            .invoice { padding: 0; border: none; width: 100%; max-width: 100%; margin: 0; }
+            .container, header, .cart-bar { display: none; }
+            
+            /* Table Header should repeat on new pages, but Footer should not */
+            thead { display: table-header-group; } 
+            tfoot { display: none; } 
+            
+            /* Ensure page breaks don't look ugly */
+            tr { page-break-inside: avoid; }
+            .summary-block { break-inside: avoid; }
         }
     </style>
 </head>
@@ -137,21 +159,22 @@
         <table>
             <thead><tr><th>Item</th><th class="text-right">Qty</th><th class="text-right">Value</th></tr></thead>
             <tbody id="oBody"></tbody>
-            <tfoot>
-                <tr>
-                    <td colspan="2" class="text-right" style="padding-top:15px;">Subtotal:</td>
-                    <td class="text-right" style="padding-top:15px;">₹<span id="subTotal">0.00</span></td>
-                </tr>
-                <tr>
-                    <td colspan="2" class="text-right">GST (5%):</td>
-                    <td class="text-right">₹<span id="gstVal">0.00</span></td>
-                </tr>
-                <tr class="total-row">
-                    <td colspan="2" class="text-right">Grand Total:</td>
-                    <td class="text-right" style="color:var(--primary);">₹<span id="grandTotal">0.00</span></td>
-                </tr>
-            </tfoot>
-        </table>
+            </table>
+
+        <div class="summary-block">
+            <div class="summary-row">
+                <span>Subtotal:</span>
+                <span>₹<span id="subTotal">0.00</span></span>
+            </div>
+            <div class="summary-row">
+                <span>GST (5%):</span>
+                <span>₹<span id="gstVal">0.00</span></span>
+            </div>
+            <div class="summary-row total">
+                <span>Grand Total:</span>
+                <span>₹<span id="grandTotal">0.00</span></span>
+            </div>
+        </div>
 
         <div class="legal-footer">
             This order form is designed for AAradhya Pharmaceuticals by AAradhya Pharmaceuticals to be used by staff and customers of AAradhya Pharmaceuticals.
@@ -169,7 +192,6 @@
     const SHEET_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQQWE4gE40MJrObusTZARsQ3mOkyQAK-djFktAEL0zgnj5sawV0hMeCgRhoDHX3JA/pub?output=csv";
     document.getElementById('sheetLink').href = SHEET_URL;
 
-    // Different proxy services to try in order
     const PROXIES = [
         "https://corsproxy.io/?",
         "https://api.allorigins.win/raw?url=", 
@@ -186,24 +208,20 @@
         el.style.display = 'block';
     }
 
-    // --- 1. ROBUST DATA LOADING ---
+    // --- 1. DATA LOADING ---
     async function init() {
-        log("⏳ Connecting to database (Attempt 1)...");
+        log("⏳ Connecting to database...");
         
         let csvText = null;
-        
-        // Loop through proxies
         for (let i = 0; i < PROXIES.length; i++) {
             try {
                 const proxy = PROXIES[i];
-                log(`⏳ Connecting to database (Attempt ${i+1})...`);
                 const res = await fetch(proxy + encodeURIComponent(SHEET_URL));
                 if (res.ok) {
                     const text = await res.text();
-                    // Verify it's actually data, not an error page
                     if(text.includes("company") || text.includes("item") || text.length > 100) {
                         csvText = text;
-                        break; // Success!
+                        break;
                     }
                 }
             } catch (e) { console.warn("Proxy failed:", PROXIES[i]); }
@@ -212,7 +230,7 @@
         if (csvText) {
             processData(csvText);
         } else {
-            log("❌ Automatic loading blocked by network.", "error");
+            log("❌ Network blocked. Use manual load.", "error");
             document.getElementById('manualInput').style.display = 'block';
         }
     }
@@ -231,7 +249,6 @@
             complete: function(results) {
                 const uniqueMap = new Map();
                 results.data.forEach(row => {
-                    // Fuzzy match column names
                     const get = (k) => row[Object.keys(row).find(key => key.toLowerCase().includes(k))];
                     const name = get("item") || get("name");
                     const comp = get("company") || "General";
@@ -246,13 +263,12 @@
 
                 db = Array.from(uniqueMap.values());
                 if(db.length === 0) {
-                     log("❌ Loaded data is empty. Try Manual Mode.", "error");
-                     document.getElementById('manualInput').style.display = 'block';
+                     log("❌ Loaded data is empty.", "error");
                      return;
                 }
 
                 log(`✅ Ready (${db.length} items)`, "success");
-                setTimeout(() => { document.getElementById('status').style.display = 'none'; }, 2000);
+                setTimeout(() => { document.getElementById('status').style.display = 'none'; }, 1000);
                 
                 document.getElementById('appControls').style.display = 'grid';
                 populateCompanies();
