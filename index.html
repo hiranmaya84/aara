@@ -28,7 +28,7 @@
         input, select { width: 100%; padding: 12px; border: 1px solid #cbd5e1; border-radius: 8px; box-sizing: border-box; font-size: 1rem; }
 
         /* Product List */
-        .product-card { background: white; padding: 15px; border-radius: 10px; margin-bottom: 10px; display: flex; justify-content: space-between; align-items: center; border: 1px solid var(--border); box-shadow: 0 1px 2px rgba(0,0,0,0.05); }
+        .product-card { background: white; padding: 15px; border-radius: 10px; margin-bottom: 10px; display: flex; justify-content: space-between; align-items: center; border: 1px solid var(--border); box-shadow: 0 1px 2px rgba(0,0,0,0.05); content-visibility: auto; contain-intrinsic-size: 100px; }
         .p-info h3 { margin: 0 0 5px 0; font-size: 1rem; color: #1e293b; }
         .p-meta { font-size: 0.85rem; color: #64748b; }
         .p-price { font-weight: bold; color: var(--primary); margin-top: 5px; }
@@ -57,17 +57,8 @@
         th { background: #f8fafc; color: #64748b; font-size: 0.85rem; text-transform: uppercase; border-bottom: 2px solid #e2e8f0; }
         .text-right { text-align: right; }
         
-        /* Summary Block (The Fix) */
-        .summary-block { 
-            width: 100%; 
-            max-width: 300px; 
-            margin-left: auto; 
-            background: #f8fafc; 
-            padding: 15px; 
-            border-radius: 8px; 
-            border: 1px solid #e2e8f0; 
-            page-break-inside: avoid; /* Prevents splitting on print */
-        }
+        /* Summary Block */
+        .summary-block { width: 100%; max-width: 300px; margin-left: auto; background: #f8fafc; padding: 15px; border-radius: 8px; border: 1px solid #e2e8f0; page-break-inside: avoid; }
         .summary-row { display: flex; justify-content: space-between; margin-bottom: 8px; font-size: 0.95rem; }
         .summary-row.total { border-top: 2px solid #cbd5e1; padding-top: 8px; font-weight: bold; font-size: 1.1rem; color: var(--primary); }
         
@@ -86,12 +77,8 @@
             .no-print { display: none !important; }
             .invoice { padding: 0; border: none; width: 100%; max-width: 100%; margin: 0; }
             .container, header, .cart-bar { display: none; }
-            
-            /* Table Header should repeat on new pages, but Footer should not */
             thead { display: table-header-group; } 
             tfoot { display: none; } 
-            
-            /* Ensure page breaks don't look ugly */
             tr { page-break-inside: avoid; }
             .summary-block { break-inside: avoid; }
         }
@@ -159,7 +146,7 @@
         <table>
             <thead><tr><th>Item</th><th class="text-right">Qty</th><th class="text-right">Value</th></tr></thead>
             <tbody id="oBody"></tbody>
-            </table>
+        </table>
 
         <div class="summary-block">
             <div class="summary-row">
@@ -191,6 +178,9 @@
     // --- SETTINGS ---
     const SHEET_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQQWE4gE40MJrObusTZARsQ3mOkyQAK-djFktAEL0zgnj5sawV0hMeCgRhoDHX3JA/pub?output=csv";
     document.getElementById('sheetLink').href = SHEET_URL;
+    const CACHE_KEY = "aaradhya_stock_data";
+    const CACHE_TIME_KEY = "aaradhya_stock_time";
+    const CACHE_DURATION = 60 * 60 * 1000; // 1 hour
 
     const PROXIES = [
         "https://corsproxy.io/?",
@@ -198,7 +188,8 @@
         "https://api.codetabs.com/v1/proxy?quest="
     ];
 
-    let db = [];
+    let db = []; // Array for filtering
+    let dbMap = new Map(); // Map for O(1) lookups
     let cart = {};
 
     function log(msg, type="info") {
@@ -208,9 +199,26 @@
         el.style.display = 'block';
     }
 
-    // --- 1. DATA LOADING ---
+    // --- 1. OPTIMIZED DATA LOADING ---
     async function init() {
-        log("⏳ Connecting to database...");
+        // Try Cache First
+        const cachedData = localStorage.getItem(CACHE_KEY);
+        const cachedTime = localStorage.getItem(CACHE_TIME_KEY);
+        const now = new Date().getTime();
+
+        if (cachedData && cachedTime && (now - cachedTime < CACHE_DURATION)) {
+            log("⚡ Loading from cache...", "success");
+            processData(cachedData, false); // false = don't save again
+            // Fetch fresh data in background to update cache for next time
+            fetchData(true);
+            return;
+        }
+
+        fetchData();
+    }
+
+    async function fetchData(background = false) {
+        if(!background) log("⏳ Connecting to database...");
         
         let csvText = null;
         for (let i = 0; i < PROXIES.length; i++) {
@@ -219,7 +227,7 @@
                 const res = await fetch(proxy + encodeURIComponent(SHEET_URL));
                 if (res.ok) {
                     const text = await res.text();
-                    if(text.includes("company") || text.includes("item") || text.length > 100) {
+                    if(text.includes("company") || text.includes("item")) {
                         csvText = text;
                         break;
                     }
@@ -228,8 +236,8 @@
         }
 
         if (csvText) {
-            processData(csvText);
-        } else {
+            processData(csvText, true);
+        } else if (!background) {
             log("❌ Network blocked. Use manual load.", "error");
             document.getElementById('manualInput').style.display = 'block';
         }
@@ -238,30 +246,59 @@
     function loadManualData() {
         const text = document.getElementById('pasteBox').value;
         if(text.length < 50) return alert("Please paste the data first.");
-        processData(text);
+        processData(text, true);
         document.getElementById('manualInput').style.display = 'none';
     }
 
-    function processData(csvData) {
-        log("Processing...", "info");
+    function processData(csvData, saveCache = false) {
+        if(saveCache) {
+            try {
+                localStorage.setItem(CACHE_KEY, csvData);
+                localStorage.setItem(CACHE_TIME_KEY, new Date().getTime());
+            } catch(e) { console.warn("Cache full"); }
+        }
+
+        // Use Worker for non-blocking parsing
         Papa.parse(csvData, {
-            header: true, skipEmptyLines: true,
+            header: true, 
+            skipEmptyLines: true,
+            worker: true, // Run in background thread
             complete: function(results) {
                 const uniqueMap = new Map();
-                results.data.forEach(row => {
-                    const get = (k) => row[Object.keys(row).find(key => key.toLowerCase().includes(k))];
-                    const name = get("item") || get("name");
-                    const comp = get("company") || "General";
-                    const rate = parseFloat((get("rate") || "0").replace(/[^\d.]/g,''));
-                    const stock = (get("stock") || "").toString();
+                
+                // Optimized processing loop
+                const data = results.data;
+                const len = data.length;
+                
+                // Detect keys once
+                if(len > 0) {
+                    const keys = Object.keys(data[0]);
+                    const kName = keys.find(k => k.toLowerCase().includes("item") || k.toLowerCase().includes("name"));
+                    const kComp = keys.find(k => k.toLowerCase().includes("company"));
+                    const kRate = keys.find(k => k.toLowerCase().includes("rate"));
+                    const kStock = keys.find(k => k.toLowerCase().includes("stock"));
 
-                    if (name && rate > 0) {
-                        const id = name + "|" + comp;
-                        if (!uniqueMap.has(id)) uniqueMap.set(id, { id, name, company: comp, rate, stock });
+                    for(let i = 0; i < len; i++) {
+                        const row = data[i];
+                        const name = row[kName];
+                        const rate = parseFloat((row[kRate] || "0").replace(/[^\d.]/g,''));
+                        
+                        if (name && rate > 0) {
+                            const comp = row[kComp] || "General";
+                            const stock = (row[kStock] || "").toString();
+                            const id = name + "|" + comp;
+                            
+                            // Use map for deduplication
+                            if (!uniqueMap.has(id)) {
+                                uniqueMap.set(id, { id, name, company: comp, rate, stock });
+                            }
+                        }
                     }
-                });
+                }
 
                 db = Array.from(uniqueMap.values());
+                dbMap = uniqueMap; // Save map for O(1) access
+
                 if(db.length === 0) {
                      log("❌ Loaded data is empty.", "error");
                      return;
@@ -272,7 +309,7 @@
                 
                 document.getElementById('appControls').style.display = 'grid';
                 populateCompanies();
-                renderList(db.slice(0, 50));
+                renderList(db.slice(0, 50)); // Limit initial render
             }
         });
     }
@@ -282,23 +319,31 @@
         const comps = [...new Set(db.map(i => i.company))].sort();
         const sel = document.getElementById('compSelect');
         sel.innerHTML = '<option value="ALL">-- All Companies --</option>';
+        // Fragment for faster DOM insertion
+        const frag = document.createDocumentFragment();
         comps.forEach(c => {
             if(c) {
                 const opt = document.createElement('option');
                 opt.value = c;
                 opt.innerText = c;
-                sel.appendChild(opt);
+                frag.appendChild(opt);
             }
         });
+        sel.appendChild(frag);
     }
 
     function filterItems() {
         const txt = document.getElementById('search').value.toLowerCase();
         const comp = document.getElementById('compSelect').value;
+        
+        // Optimized filter
         const filtered = db.filter(i => {
-            return i.name.toLowerCase().includes(txt) && (comp === "ALL" || i.company === comp);
+            return (comp === "ALL" || i.company === comp) && 
+                   (txt === "" || i.name.toLowerCase().includes(txt));
         });
-        renderList(filtered.slice(0, txt ? 500 : 50));
+        
+        // Limit render count for performance
+        renderList(filtered.slice(0, txt ? 100 : 50));
     }
 
     function renderList(items) {
@@ -307,24 +352,27 @@
         if(items.length===0) return div.innerHTML = '<div style="text-align:center; padding:20px;">No items found</div>';
 
         const frag = document.createDocumentFragment();
-        items.forEach(i => {
-            const q = cart[i.id] || 0;
+        // Render loop
+        for(let i=0; i<items.length; i++) {
+            const item = items[i];
+            const q = cart[item.id] || 0;
             const el = document.createElement('div');
             el.className = 'product-card';
+            // Use dataset for event delegation (optional, but clean)
             el.innerHTML = `
                 <div class="p-info">
-                    <h3>${i.name}</h3>
-                    <div class="p-meta">${i.company} ${i.stock ? '| Stock: '+i.stock : ''}</div>
-                    <div class="p-price">₹${i.rate.toFixed(2)}</div>
+                    <h3>${item.name}</h3>
+                    <div class="p-meta">${item.company} ${item.stock ? '| Stock: '+item.stock : ''}</div>
+                    <div class="p-price">₹${item.rate.toFixed(2)}</div>
                 </div>
                 <div class="qty-box">
-                    <button class="q-btn" onclick="upd('${i.id}', -1)">-</button>
-                    <div class="q-val" id="q_${cleanId(i.id)}">${q}</div>
-                    <button class="q-btn" onclick="upd('${i.id}', 1)">+</button>
+                    <button class="q-btn" onclick="upd('${item.id.replace(/'/g, "\\'")}', -1)">-</button>
+                    <div class="q-val" id="q_${cleanId(item.id)}">${q}</div>
+                    <button class="q-btn" onclick="upd('${item.id.replace(/'/g, "\\'")}', 1)">+</button>
                 </div>
             `;
             frag.appendChild(el);
-        });
+        }
         div.appendChild(frag);
     }
 
@@ -335,16 +383,25 @@
         if (!cart[id]) cart[id] = 0;
         cart[id] += d;
         if (cart[id] <= 0) delete cart[id];
+        
+        // Direct DOM update (Fast)
         const el = document.getElementById('q_' + cleanId(id));
         if (el) el.innerText = cart[id] || 0;
+        
         calcTotal();
     };
 
     function calcTotal() {
         let total = 0, count = 0;
-        for (let id in cart) {
-            const item = db.find(x => x.id === id);
-            if (item) { total += item.rate * cart[id]; count++; }
+        const keys = Object.keys(cart);
+        // Map lookup is O(1)
+        for (let i=0; i<keys.length; i++) {
+            const id = keys[i];
+            const item = dbMap.get(id);
+            if (item) { 
+                total += item.rate * cart[id]; 
+                count++; 
+            }
         }
         document.getElementById('cTotal').innerText = total.toFixed(2);
         document.getElementById('cartCount').innerText = count;
@@ -369,19 +426,25 @@
         const body = document.getElementById('oBody');
         body.innerHTML = '';
         let subtotal = 0;
+        let html = '';
 
-        for (let id in cart) {
-            const item = db.find(x => x.id === id);
-            const val = item.rate * cart[id];
-            subtotal += val;
-            body.innerHTML += `
-                <tr>
-                    <td>${item.name}<br><small>${item.company}</small></td>
-                    <td class="text-right">${cart[id]}</td>
-                    <td class="text-right">₹${val.toFixed(2)}</td>
-                </tr>
-            `;
+        const keys = Object.keys(cart);
+        for (let i=0; i<keys.length; i++) {
+            const id = keys[i];
+            const item = dbMap.get(id);
+            if(item) {
+                const val = item.rate * cart[id];
+                subtotal += val;
+                html += `
+                    <tr>
+                        <td>${item.name}<br><small>${item.company}</small></td>
+                        <td class="text-right">${cart[id]}</td>
+                        <td class="text-right">₹${val.toFixed(2)}</td>
+                    </tr>
+                `;
+            }
         }
+        body.innerHTML = html; // Single DOM write
 
         const gst = subtotal * 0.05;
         const total = subtotal + gst;
@@ -408,9 +471,11 @@
         text += `👤 ${name} (${mobile})\n`;
         text += `📅 ${new Date().toLocaleDateString()}\n\n`;
         
-        for (let id in cart) {
-            const item = db.find(x => x.id === id);
-            text += `${cart[id]} x ${item.name}\n`;
+        const keys = Object.keys(cart);
+        for (let i=0; i<keys.length; i++) {
+            const id = keys[i];
+            const item = dbMap.get(id);
+            if(item) text += `${cart[id]} x ${item.name}\n`;
         }
 
         const grand = document.getElementById('grandTotal').innerText;
@@ -424,4 +489,41 @@
 </script>
 </body>
 </html>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
