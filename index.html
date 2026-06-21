@@ -846,7 +846,7 @@ border:1px solid rgba(0,229,255,.12);
       <button class="tab-btn on" onclick="switchTab('dashboard',this)">COMMAND</button>
       <button class="tab-btn" id="tab-agents-btn" onclick="switchTab('details',this)">AGENTS</button>
       <button class="tab-btn"
- onclick="showPage('routes')">
+ onclick="switchTab('routes',this)">
  ROUTES
 </button>
       </div>
@@ -935,9 +935,6 @@ border:1px solid rgba(0,229,255,.12);
 <div class="v7-route-analytics">
 
   <b>Route Performance Tracker</b>
-  <div id="routeTrackerDetail"></div>
-  <div class="v7-box"
-     onclick="openRouteTracker('${name}')">
 
   <div id="routeSnapshot"
        class="v7-grid"></div>
@@ -978,8 +975,6 @@ border:1px solid rgba(0,229,255,.12);
 </div>
   <!-- ── AGENTS LIST ── -->
   <div id="page-details" class="page">
-<div id="page-routeDetail" class="page">
-
   <div class="panel">
 
     <div class="panel-hd">
@@ -995,6 +990,8 @@ border:1px solid rgba(0,229,255,.12);
   </div>
 
 </div>
+  <div id="page-routeDetail" class="page">
+  </div>
   <div class="panel">
 
      <div class="panel-hd">
@@ -2100,6 +2097,7 @@ document.getElementById('v7Status').textContent =
   renderDashCharts(ids,totals);
   renderRoutes();
   renderRouteSnapshot();
+  showPage('dashboard');
 }
 
 /* ═══════ PROFILE-LEVEL ANALYTICS CHARTS ═══════ */
