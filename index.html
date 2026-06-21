@@ -975,6 +975,26 @@ border:1px solid rgba(0,229,255,.12);
 </div>
   <!-- ── AGENTS LIST ── -->
   <div id="page-details" class="page">
+
+  <div class="search-wrap">
+    <svg viewBox="0 0 24 24">
+      <circle cx="11" cy="11" r="8"/>
+      <line x1="21" y1="21" x2="16.65" y2="16.65"/>
+    </svg>
+
+    <input class="search-inp"
+           id="search-inp"
+           type="text"
+           placeholder="Search agent name, city or district…"
+           oninput="filterBiz()">
+  </div>
+
+  <div class="plist" id="plist-area"></div>
+
+</div>
+
+<div id="page-routeDetail" class="page">
+
   <div class="panel">
 
     <div class="panel-hd">
@@ -990,8 +1010,6 @@ border:1px solid rgba(0,229,255,.12);
   </div>
 
 </div>
-  <div id="page-routeDetail" class="page">
-  </div>
   <div class="panel">
 
      <div class="panel-hd">
@@ -1022,7 +1040,6 @@ border:1px solid rgba(0,229,255,.12);
         </div>
      </div>
 
-     <div id="routes-area"></div>
 
   </div>
 
@@ -1656,9 +1673,17 @@ for(let i=1;i<cm.length;i++){
        bounced to the full dashboard, and there's no point rendering a
        dashboard nobody can see yet during the initial boot check. */
     if(AUTH&&AUTH.role==='admin'){
-      buildPills();renderDash();buildBizList();renderRoutes();
-      showPage('dashboard');
-    }else if(AUTH&&AUTH.role==='customer'){
+buildPills();
+
+renderDash();
+
+buildBizList();
+
+renderRoutes();
+
+renderRouteSnapshot();
+
+showPage('dashboard');    }else if(AUTH&&AUTH.role==='customer'){
       showDetailById(AUTH.custId);
     }
   }catch(e){
@@ -1699,11 +1724,7 @@ function renderRouteSnapshot(){
 
  <div class="v7-box"
 
-      onclick="
-       openRouteTracker(
-        '${name}'
-       )
-      "
+      onclick="openRouteTracker('${name}')"
 
       style="cursor:pointer">
 
@@ -1723,21 +1744,38 @@ function renderRouteSnapshot(){
 }
 function openRouteTracker(route){
 
- const rt=buildRouteAnalytics();
+ const rt =
+   buildRouteAnalytics();
 
- const r=rt[route];
+ const r =
+   rt[route];
 
- if(!r) return;
+ if(!r){
+   alert('No data found');
+   return;
+ }
+
+ const customersInRoute =
+   routeMaster.filter(x => {
+
+      const rr =
+       (x.route || '')
+       .trim()
+       .toUpperCase();
+
+      return rr === route;
+
+   });
+
+ const efficiency =
+   r.revenue > 0
+    ? ((r.collection/r.revenue)*100)
+    : 0;
 
  document.getElementById(
    'routeTitle'
- ).textContent=
+ ).textContent =
    route + ' PERFORMANCE TRACKER';
-
- const customersInRoute =
-   routeMaster.filter(x =>
-      (x.route||'')===route
-   );
 
  document.getElementById(
    'routeDetailArea'
@@ -1746,44 +1784,68 @@ function openRouteTracker(route){
  <div class="metrics-grid">
 
    <div class="mc">
-     <div class="mc-lbl">REVENUE</div>
-     <div class="mc-val">
-       ${fmtINR(r.revenue)}
-     </div>
+      <div class="mc-lbl">
+        REVENUE
+      </div>
+
+      <div class="mc-val">
+        ${fmtINR(r.revenue)}
+      </div>
    </div>
 
    <div class="mc">
-     <div class="mc-lbl">COLLECTION</div>
-     <div class="mc-val">
-       ${fmtINR(r.collection)}
-     </div>
+      <div class="mc-lbl">
+        COLLECTION
+      </div>
+
+      <div class="mc-val">
+        ${fmtINR(r.collection)}
+      </div>
    </div>
 
    <div class="mc">
-     <div class="mc-lbl">OUTSTANDING</div>
-     <div class="mc-val">
-       ${fmtINR(r.outstanding)}
-     </div>
+      <div class="mc-lbl">
+        OUTSTANDING
+      </div>
+
+      <div class="mc-val">
+        ${fmtINR(r.outstanding)}
+      </div>
    </div>
 
    <div class="mc">
-     <div class="mc-lbl">ACTIVE</div>
-     <div class="mc-val">
-       ${r.active}
-     </div>
+      <div class="mc-lbl">
+        ACTIVE
+      </div>
+
+      <div class="mc-val">
+        ${r.active}
+      </div>
    </div>
 
    <div class="mc">
-     <div class="mc-lbl">BLOCKED</div>
-     <div class="mc-val">
-       ${r.blocked}
-     </div>
+      <div class="mc-lbl">
+        BLOCKED
+      </div>
+
+      <div class="mc-val">
+        ${r.blocked}
+      </div>
+   </div>
+
+   <div class="mc">
+      <div class="mc-lbl">
+        EFFICIENCY
+      </div>
+
+      <div class="mc-val">
+        ${efficiency.toFixed(1)}%
+      </div>
    </div>
 
  </div>
 
- <div class="panel"
-      style="margin-top:12px">
+ <div class="panel">
 
    <div class="panel-hd">
 
@@ -1795,37 +1857,51 @@ function openRouteTracker(route){
 
    ${customersInRoute.map(c=>`
 
-     <div class="pl-item"
-          onclick="showDetailById('${c.customerId}')">
+      <div class="pl-item"
+           onclick="showDetailById('${c.customerId}')">
 
-        <div class="pl-main">
+         <div class="pl-info">
 
-           <div class="pl-name">
+            <div class="pl-name">
 
-             ${c.businessName}
+               ${c.businessName}
 
-           </div>
+            </div>
 
-           <div class="pl-sub">
+            <div class="pl-loc">
 
-             ${c.accountStatus}
+               ${c.accountStatus}
 
-             ·
+               •
 
-             ${fmtINR(c.balance)}
+               ${fmtINR(c.balance)}
 
-           </div>
+            </div>
 
-        </div>
+         </div>
 
-     </div>
+      </div>
 
    `).join('')}
 
  </div>
+
+ <div style="padding:12px">
+
+   <button
+      class="hbtn hbtn-cyan"
+      onclick="showPage('routes')">
+
+      ◄ BACK TO ROUTES
+
+   </button>
+
+ </div>
+
  `;
 
  showPage('routeDetail');
+
 }
 /* ═══════ AGGREGATION ═══════ */
   function buildRouteAnalytics(){
@@ -2712,15 +2788,34 @@ function showDetailById(custId){
 
 /* ═══════ NAVIGATION ═══════ */
 function showPage(page){
-  ['dashboard','details','detail','routes'].forEach(p=>document.getElementById('page-'+p).classList.remove('on'));
-  document.getElementById('page-'+page).classList.add('on');
-  const isD=page==='detail';
-  document.getElementById('main-tabs').style.display=isD?'none':'flex';
-  document.getElementById('nav-back').style.display=isD?'block':'none';
-  document.getElementById('nav-home').style.display=isD?'block':'none';
-  if(navStack[navStack.length-1]!==page)navStack.push(page);
-  if(!isD)document.querySelectorAll('.tab-btn').forEach((b,i)=>b.classList.toggle('on',(page==='dashboard'&&i===0)||(page==='details'&&i===1)));
-  window.scrollTo(0,0);
+
+ [
+  'dashboard',
+  'details',
+  'detail',
+  'routes',
+  'routeDetail'
+ ]
+ .forEach(p=>{
+
+   const el =
+     document.getElementById(
+       'page-'+p
+     );
+
+   if(el)
+     el.classList.remove('on');
+
+ });
+
+ const target =
+   document.getElementById(
+     'page-'+page
+   );
+
+ if(target)
+   target.classList.add('on');
+
 }
 function switchTab(page,el){
   if(AUTH&&AUTH.role==='customer')return; /* customers stay on their own profile */
