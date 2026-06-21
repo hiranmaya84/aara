@@ -970,10 +970,19 @@ border:1px solid rgba(0,229,255,.12);
     <!-- receipts summary -->
     <div id="rcpt-section"></div>
   </div>
+<div id="page-routes" class="page">
 
+  <div class="panel">
+    <div class="panel-hd">
+      <div class="panel-title">ROUTE ANALYTICS</div>
+    </div>
+
+    <div id="routes-area"></div>
+  </div>
+
+</div>
   <!-- ── AGENTS LIST ── -->
   <div id="page-details" class="page">
-    <div id="page-routes" class="page">
 
   <div class="panel">
 
@@ -996,7 +1005,7 @@ border:1px solid rgba(0,229,255,.12);
   </div>
 
   <!-- ── AGENT DETAIL ── -->
-  <div id="page-detail" class="page"><div id="page-routes" class="page">
+  <div id="page-detail" class="page">
 
   <div class="panel">
 
@@ -1640,7 +1649,7 @@ for(let i=1;i<cm.length;i++){
        bounced to the full dashboard, and there's no point rendering a
        dashboard nobody can see yet during the initial boot check. */
     if(AUTH&&AUTH.role==='admin'){
-      buildPills();renderDash();buildBizList();
+      buildPills();renderDash();buildBizList();renderRoutes();
       showPage('dashboard');
     }else if(AUTH&&AUTH.role==='customer'){
       showDetailById(AUTH.custId);
