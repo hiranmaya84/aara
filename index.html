@@ -1628,6 +1628,88 @@ function renderDash(){
   const totalOutstanding=Math.max(0,allInitOut+allBilled-allCollected);
   const totalBase=allInitOut+allBilled;
   const collectionPct=totalBase>0?Math.min(100,Math.round(allCollected/totalBase*100)):0;
+  /* ===== EXECUTIVE DASHBOARD LIVE DATA ===== */
+
+const diamondCount =
+  ids.filter(id => (totals[id] || 0) >= 100000).length;
+
+document.getElementById('kpiRevenue').textContent =
+  fmtINR(rev);
+
+document.getElementById('kpiAgents').textContent =
+  ids.length;
+
+document.getElementById('kpiDiamond').textContent =
+  diamondCount;
+
+document.getElementById('kpiCollection').textContent =
+  fmtINR(rcptTotal);
+
+document.getElementById('v4Agents').textContent =
+  ids.length;
+
+/* Collection % */
+const execVals =
+ document.querySelectorAll('.exec-value');
+
+if(execVals[2])
+ execVals[2].textContent =
+   collectionPct + '%';
+
+/* Growth */
+const prevRevenue =
+ prevMo
+  ? orders
+      .filter(o=>o.month===prevMo)
+      .reduce((s,o)=>s+o.amount,0)
+  : 0;
+
+const growth =
+ prevRevenue > 0
+  ? ((rev-prevRevenue)/prevRevenue)*100
+  : 0;
+
+if(execVals[3])
+ execVals[3].textContent =
+   (growth>=0?'+':'') +
+   growth.toFixed(1)+'%';
+
+/* V6 Cards */
+
+const v6 =
+ document.querySelectorAll('.v6-value');
+
+if(v6[0])
+ v6[0].textContent =
+   Math.round((rev/800000)*100)+'%';
+
+if(v6[1])
+ v6[1].textContent =
+   fmtINR(totalOutstanding);
+
+if(v6[2])
+ v6[2].textContent =
+   fmtINR(Math.round(rev*1.15));
+
+if(v6[3])
+ v6[3].textContent =
+   rev>=800000 ? 'A+' :
+   rev>=600000 ? 'A' :
+   rev>=400000 ? 'B' :
+   rev>=200000 ? 'C' : 'D';
+
+/* Forecast Engine */
+
+const forecast =
+ Math.round(rev*1.15);
+
+document.getElementById('v7Forecast').textContent =
+ fmtINR(forecast);
+
+document.getElementById('v7Status').textContent =
+ forecast>=800000
+  ? 'TARGET LIKELY'
+  : 'NEEDS PUSH';
 
   /* metrics — 4 cards */
   document.getElementById('metrics-area').className='metrics-grid metrics-grid-4';
