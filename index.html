@@ -845,6 +845,12 @@ border:1px solid rgba(0,229,255,.12);
     <div class="tab-rack" id="main-tabs">
       <button class="tab-btn on" onclick="switchTab('dashboard',this)">COMMAND</button>
       <button class="tab-btn" id="tab-agents-btn" onclick="switchTab('details',this)">AGENTS</button>
+      <button
+ onclick="showPage('routes')">
+
+ ROUTES
+
+</button>
     </div>
     <button class="hbtn hbtn-cyan" onclick="loadData()">⟳ SYNC</button>
     <button class="hbtn hbtn-ghost" onclick="handleLogout()" title="Log out">⏻</button>
@@ -967,6 +973,21 @@ border:1px solid rgba(0,229,255,.12);
 
   <!-- ── AGENTS LIST ── -->
   <div id="page-details" class="page">
+    <div id="page-routes" class="page">
+
+  <div class="panel">
+
+     <div class="panel-hd">
+        <div class="panel-title">
+          ROUTE ANALYTICS
+        </div>
+     </div>
+
+     <div id="routes-area"></div>
+
+  </div>
+
+</div>
     <div class="search-wrap">
       <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
       <input class="search-inp" id="search-inp" type="text" placeholder="Search agent name, city or district…" oninput="filterBiz()">
@@ -975,7 +996,21 @@ border:1px solid rgba(0,229,255,.12);
   </div>
 
   <!-- ── AGENT DETAIL ── -->
-  <div id="page-detail" class="page"></div>
+  <div id="page-detail" class="page"><div id="page-routes" class="page">
+
+  <div class="panel">
+
+     <div class="panel-hd">
+        <div class="panel-title">
+          ROUTE ANALYTICS
+        </div>
+     </div>
+
+     <div id="routes-area"></div>
+
+  </div>
+
+</div></div>
 
 </div><!-- /shell -->
 
@@ -985,8 +1020,8 @@ border:1px solid rgba(0,229,255,.12);
 /* ═══════ CONSTANTS ═══════ */
 const SID='1bjUIiD3xL8NWWzkZAatxvwp5n98yq7JVE5FODCbmvAs';
 const CSV='https://docs.google.com/spreadsheets/d/'+SID+'/gviz/tq?tqx=out:csv&sheet=';
-
 let customers=[],orders=[],receipts=[],allMonths=[];
+let routeMaster=[];
 let selMonth='All',navStack=['dashboard'];
 /* AUTH — { role: 'admin'|'customer', custId: string|null }
    role='admin' sees all data unrestricted, same as before.
@@ -1487,6 +1522,7 @@ async function loadData(){
   ['dashboard','details','detail'].forEach(p=>document.getElementById('page-'+p).classList.remove('on'));
   try{
     const[cr,or,rr]=await Promise.all([fetchSheet('1_CUSTOMERS'),fetchSheet('2_ORDERS'),fetchSheet('12_RECEIPTS')]);
+    const cm=await fetchSheet('COLUMN_MASTER');
 
     /* ── 1_CUSTOMERS: resolve columns by header, fallback to known index ── */
     const cH=cr[0]||[];
@@ -1553,6 +1589,45 @@ async function loadData(){
       const month=normMonth(sheetMonth)||monthFromDateObj(dObj);
       receipts.push({custId:r[rIdCustIdx]||'Unknown',bizName:r[rIdBizIdx]||'',date:rcptDate,_d:dObj,month,amount:amt});
     }
+    routeMaster=[];
+
+for(let i=1;i<cm.length;i++){
+
+ const r=cm[i];
+
+ routeMaster.push({
+
+   customerId:r[0]||'',
+   businessName:r[1]||'',
+
+   area:r[2]||'',
+   route:r[3]||'',
+
+   mr:r[4]||'',
+
+   accountStatus:r[5]||'',
+
+   reactivatePayment:
+      Number(r[6]||0),
+
+   fyBusiness:
+      Number(r[7]||0),
+
+   fyCollection:
+      Number(r[8]||0),
+
+   balance:
+      Number(r[9]||0),
+
+   lat:
+      Number(r[10]||0),
+
+   lng:
+      Number(r[11]||0)
+
+ });
+
+}
     allMonths=[...new Set([...orders.map(o=>o.month),...receipts.map(r=>r.month)].filter(Boolean))].sort((a,b)=>moVal(b)-moVal(a));
 
     document.getElementById('loading-scr').style.display='none';
@@ -1591,6 +1666,74 @@ function buildPills(){
 }
 
 /* ═══════ AGGREGATION ═══════ */
+  function buildRouteAnalytics(){
+
+ const routes={};
+
+ routeMaster.forEach(r=>{
+
+   if(!routes[r.route]){
+
+      routes[r.route]={
+        revenue:0,
+        collection:0,
+        outstanding:0,
+        active:0,
+        blocked:0
+      };
+   }
+
+   routes[r.route].outstanding += r.balance;
+
+   if(r.accountStatus==='ACTIVE')
+      routes[r.route].active++;
+
+   if(r.accountStatus==='BLOCKED')
+      routes[r.route].blocked++;
+
+ });
+
+ orders.forEach(o=>{
+
+   const rm=
+      routeMaster.find(
+       x=>x.customerId===o.custId
+      );
+
+   if(!rm)return;
+
+   routes[rm.route].revenue+=o.amount;
+
+ });
+
+ receipts.forEach(r=>{
+
+   const rm=
+      routeMaster.find(
+       x=>x.customerId===r.custId
+      );
+
+   if(!rm)return;
+
+   routes[rm.route].collection+=r.amount;
+
+ });
+
+ return routes;
+}
+
+function routeHealth(r){
+
+ const cp=
+   r.revenue>0
+    ? (r.collection/r.revenue)*100
+    : 0;
+
+ if(cp>=90)return '🟢';
+ if(cp>=75)return '🟡';
+
+ return '🔴';
+}
 function filtOrd(){return selMonth==='All'?orders:orders.filter(o=>o.month===selMonth);}
 function totalsFrom(ords){
   const t={};
@@ -1790,6 +1933,7 @@ document.getElementById('v7Status').textContent =
   renderTierChanges(chgMap,curMo,prevMo,nm);
   renderReceiptsDash(fRcpts,rcptTotal,rcptCount,curMo);
   renderDashCharts(ids,totals);
+  renderRoutes();
 }
 
 /* ═══════ PROFILE-LEVEL ANALYTICS CHARTS ═══════ */
@@ -2018,6 +2162,69 @@ function renderReceiptsDash(fRcpts,rcptTotal,rcptCount,curMo){
 }
 
 /* ═══════ BIZ LIST ═══════ */
+  function renderRoutes(){
+
+ const rt=
+   buildRouteAnalytics();
+
+ const el=
+   document.getElementById(
+      'routes-area'
+   );
+
+ if(!el)return;
+
+ el.innerHTML=
+
+ Object.entries(rt)
+ .map(([name,r])=>`
+
+ <div class="mc"
+      style="margin-bottom:12px">
+
+   <div class="mc-lbl">
+
+     ${name}
+
+   </div>
+
+   <div class="mc-sub">
+
+     Revenue :
+     ${fmtINR(r.revenue)}
+
+     <br>
+
+     Collection :
+     ${fmtINR(r.collection)}
+
+     <br>
+
+     Outstanding :
+     ${fmtINR(r.outstanding)}
+
+     <br>
+
+     Active :
+     ${r.active}
+
+     <br>
+
+     Blocked :
+     ${r.blocked}
+
+     <br>
+
+     Health :
+     ${routeHealth(r)}
+
+   </div>
+
+ </div>
+
+ `).join('');
+
+}
 function buildBizList(){
   const t=totalsFrom(orders);
   window._AT=t;
