@@ -845,13 +845,11 @@ border:1px solid rgba(0,229,255,.12);
     <div class="tab-rack" id="main-tabs">
       <button class="tab-btn on" onclick="switchTab('dashboard',this)">COMMAND</button>
       <button class="tab-btn" id="tab-agents-btn" onclick="switchTab('details',this)">AGENTS</button>
-      <button
+      <button class="tab-btn"
  onclick="showPage('routes')">
-
  ROUTES
-
 </button>
-    </div>
+      </div>
     <button class="hbtn hbtn-cyan" onclick="loadData()">⟳ SYNC</button>
     <button class="hbtn hbtn-ghost" onclick="handleLogout()" title="Log out">⏻</button>
   </div>
@@ -941,13 +939,10 @@ border:1px solid rgba(0,229,255,.12);
 </div>
 
 <div class="v7-route-analytics">
-<b>Route Analytics</b>
-<div class="v7-grid">
-<div class="v7-box">Padampur</div>
-<div class="v7-box">Paikmal</div>
-<div class="v7-box">Jharbandh</div>
+  <b>Route Analytics Snapshot</b>
+  <div id="routeSnapshot" class="v7-grid">  </div>   
 </div>
-</div>
+
 
 <div class="metrics-grid" id="metrics-area"></div>
     <!-- tiers -->
@@ -1673,7 +1668,36 @@ function buildPills(){
     c.appendChild(b);
   });
 }
+function renderRouteSnapshot(){
 
+ const rt=buildRouteAnalytics();
+
+ const el=document.getElementById('routeSnapshot');
+
+ if(!el) return;
+
+ el.innerHTML=
+ Object.entries(rt)
+ .slice(0,6)
+ .map(([name,r])=>`
+
+   <div class="v7-box">
+
+     <b>${name}</b><br>
+
+     Revenue :
+     ${fmtINR(r.revenue)}<br>
+
+     Collection :
+     ${fmtINR(r.collection)}<br>
+
+     Health :
+     ${routeHealth(r)}
+
+   </div>
+
+ `).join('');
+}
 /* ═══════ AGGREGATION ═══════ */
   function buildRouteAnalytics(){
 
@@ -1943,6 +1967,7 @@ document.getElementById('v7Status').textContent =
   renderReceiptsDash(fRcpts,rcptTotal,rcptCount,curMo);
   renderDashCharts(ids,totals);
   renderRoutes();
+  renderRouteSnapshot();
 }
 
 /* ═══════ PROFILE-LEVEL ANALYTICS CHARTS ═══════ */
@@ -2171,68 +2196,69 @@ function renderReceiptsDash(fRcpts,rcptTotal,rcptCount,curMo){
 }
 
 /* ═══════ BIZ LIST ═══════ */
-  function renderRoutes(){
+function renderRoutes(){
 
- const rt=
-   buildRouteAnalytics();
+ const rt=buildRouteAnalytics();
 
- const el=
-   document.getElementById(
-      'routes-area'
-   );
+ const el=document.getElementById('routes-area');
 
- if(!el)return;
+ if(!el) return;
 
  el.innerHTML=
-
  Object.entries(rt)
- .map(([name,r])=>`
+ .sort((a,b)=>b[1].revenue-a[1].revenue)
+ .map(([name,r])=>{
 
- <div class="mc"
-      style="margin-bottom:12px">
+   const efficiency=
+     r.revenue>0
+       ? ((r.collection/r.revenue)*100)
+       : 0;
 
-   <div class="mc-lbl">
+   return `
 
-     ${name}
+   <div class="mc" style="margin-bottom:12px">
+
+     <div class="mc-lbl">${name}</div>
+
+     <div class="mc-val">
+       ${fmtINR(r.revenue)}
+     </div>
+
+     <div class="mc-sub">
+
+       Collection :
+       ${fmtINR(r.collection)}
+
+       <br>
+
+       Outstanding :
+       ${fmtINR(r.outstanding)}
+
+       <br>
+
+       Active :
+       ${r.active}
+
+       <br>
+
+       Blocked :
+       ${r.blocked}
+
+       <br>
+
+       Efficiency :
+       ${efficiency.toFixed(1)}%
+
+       <br>
+
+       Health :
+       ${routeHealth(r)}
+
+     </div>
 
    </div>
-
-   <div class="mc-sub">
-
-     Revenue :
-     ${fmtINR(r.revenue)}
-
-     <br>
-
-     Collection :
-     ${fmtINR(r.collection)}
-
-     <br>
-
-     Outstanding :
-     ${fmtINR(r.outstanding)}
-
-     <br>
-
-     Active :
-     ${r.active}
-
-     <br>
-
-     Blocked :
-     ${r.blocked}
-
-     <br>
-
-     Health :
-     ${routeHealth(r)}
-
-   </div>
-
- </div>
-
- `).join('');
-
+   `;
+ }).join('');
 }
 function buildBizList(){
   const t=totalsFrom(orders);
