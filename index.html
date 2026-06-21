@@ -984,7 +984,6 @@ border:1px solid rgba(0,229,255,.12);
         </div>
      </div>
 
-     <div id="routes-area"></div>
 
   </div>
 
@@ -1705,6 +1704,81 @@ function renderRouteSnapshot(){
  </div>
 
  `).join('');
+}
+  function openRouteTracker(route){
+
+ const rt = buildRouteAnalytics();
+ const r = rt[route];
+
+ if(!r){
+   alert('No data found for '+route);
+   return;
+ }
+
+ const efficiency =
+   r.revenue > 0
+   ? ((r.collection / r.revenue) * 100)
+   : 0;
+
+ document.getElementById('routes-area').innerHTML = `
+
+   <div class="panel">
+     <div class="panel-hd">
+       <div class="panel-title">
+         ${route} PERFORMANCE TRACKER
+       </div>
+     </div>
+
+     <div class="metrics-grid">
+
+       <div class="mc hero">
+         <div class="mc-lbl">REVENUE</div>
+         <div class="mc-val">${fmtINR(r.revenue)}</div>
+       </div>
+
+       <div class="mc">
+         <div class="mc-lbl">COLLECTION</div>
+         <div class="mc-val">${fmtINR(r.collection)}</div>
+       </div>
+
+       <div class="mc">
+         <div class="mc-lbl">OUTSTANDING</div>
+         <div class="mc-val">${fmtINR(r.outstanding)}</div>
+       </div>
+
+       <div class="mc">
+         <div class="mc-lbl">EFFICIENCY</div>
+         <div class="mc-val">${efficiency.toFixed(1)}%</div>
+       </div>
+
+       <div class="mc">
+         <div class="mc-lbl">ACTIVE</div>
+         <div class="mc-val">${r.active}</div>
+       </div>
+
+       <div class="mc">
+         <div class="mc-lbl">BLOCKED</div>
+         <div class="mc-val">${r.blocked}</div>
+       </div>
+
+       <div class="mc">
+         <div class="mc-lbl">HEALTH</div>
+         <div class="mc-val">${routeHealth(r)}</div>
+       </div>
+
+     </div>
+
+     <div style="padding:15px">
+       <button class="hbtn hbtn-cyan"
+               onclick="renderRoutes();showPage('routes')">
+         ◄ BACK TO ROUTES
+       </button>
+     </div>
+
+   </div>
+ `;
+
+ showPage('routes');
 }
 /* ═══════ AGGREGATION ═══════ */
   function buildRouteAnalytics(){
@@ -2590,7 +2664,7 @@ function showDetailById(custId){
 
 /* ═══════ NAVIGATION ═══════ */
 function showPage(page){
-  ['dashboard','details','detail'].forEach(p=>document.getElementById('page-'+p).classList.remove('on'));
+  ['dashboard','details','detail','routes'].forEach(p=>document.getElementById('page-'+p).classList.remove('on'));
   document.getElementById('page-'+page).classList.add('on');
   const isD=page==='detail';
   document.getElementById('main-tabs').style.display=isD?'none':'flex';
@@ -2765,53 +2839,6 @@ function getFilteredReceipts(){
    return (window.receipts||[]).filter(r=>String(r.orderMonth||r.month||'')===window.selMonth);
  }
  return window.receipts||[];
-}
-function openRouteTracker(route){
-
- const rt=
-   buildRouteAnalytics();
-
- const r=rt[route];
-
- if(!r) return;
-
- const efficiency=
-   r.revenue>0
-    ? ((r.collection/r.revenue)*100)
-    : 0;
-
- document.getElementById(
-   'routeDetail'
- ).innerHTML=`
-
-   <h2>${route}</h2>
-
-   Revenue :
-   ${fmtINR(r.revenue)}<br>
-
-   Collection :
-   ${fmtINR(r.collection)}<br>
-
-   Outstanding :
-   ${fmtINR(r.outstanding)}<br>
-
-   Active :
-   ${r.active}<br>
-
-   Blocked :
-   ${r.blocked}<br>
-
-   Efficiency :
-   ${efficiency.toFixed(1)}%<br>
-
-   Health :
-   ${routeHealth(r)}
-
- `;
-
- document.getElementById(
-   'routeModal'
- ).style.display='block';
 }
 function updateV10Dashboard(){
  try{
