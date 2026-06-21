@@ -1754,18 +1754,22 @@ function openRouteTracker(route){
    alert('No data found');
    return;
  }
+const customersInRoute =
+ routeMaster.filter(x => {
 
- const customersInRoute =
-   routeMaster.filter(x => {
+   const rr =
+    String(
+      x.route || x.area || ''
+    )
+    .trim()
+    .toUpperCase();
 
-      const rr =
-       (x.route || '')
-       .trim()
-       .toUpperCase();
+   return rr ===
+     String(route)
+      .trim()
+      .toUpperCase();
 
-      return rr === route;
-
-   });
+ });
 
  const efficiency =
    r.revenue > 0
