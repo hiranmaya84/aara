@@ -939,10 +939,13 @@ border:1px solid rgba(0,229,255,.12);
 </div>
 
 <div class="v7-route-analytics">
-  <b>Route Analytics Snapshot</b>
-  <div id="routeSnapshot" class="v7-grid">  </div>   
-</div>
 
+  <b>Route Performance Tracker</b>
+
+  <div id="routeSnapshot"
+       class="v7-grid"></div>
+
+</div>
 
 <div class="metrics-grid" id="metrics-area"></div>
     <!-- tiers -->
@@ -1670,31 +1673,42 @@ function buildPills(){
 }
 function renderRouteSnapshot(){
 
- const rt=buildRouteAnalytics();
+ const rt=
+   buildRouteAnalytics();
 
- const el=document.getElementById('routeSnapshot');
+ const el=
+   document.getElementById(
+    'routeSnapshot'
+   );
 
  if(!el) return;
 
  el.innerHTML=
+
  Object.entries(rt)
- .slice(0,6)
  .map(([name,r])=>`
 
-   <div class="v7-box">
+ <div class="v7-box"
 
-     <b>${name}</b><br>
+      onclick="
+       openRouteTracker(
+        '${name}'
+       )
+      "
 
-     Revenue :
-     ${fmtINR(r.revenue)}<br>
+      style="cursor:pointer">
 
-     Collection :
-     ${fmtINR(r.collection)}<br>
+   <b>${name}</b>
 
-     Health :
-     ${routeHealth(r)}
+   <br>
 
-   </div>
+   Performance Tracker
+
+   <br>
+
+   ${routeHealth(r)}
+
+ </div>
 
  `).join('');
 }
@@ -2758,7 +2772,53 @@ function getFilteredReceipts(){
  }
  return window.receipts||[];
 }
+function openRouteTracker(route){
 
+ const rt=
+   buildRouteAnalytics();
+
+ const r=rt[route];
+
+ if(!r) return;
+
+ const efficiency=
+   r.revenue>0
+    ? ((r.collection/r.revenue)*100)
+    : 0;
+
+ document.getElementById(
+   'routeDetail'
+ ).innerHTML=`
+
+   <h2>${route}</h2>
+
+   Revenue :
+   ${fmtINR(r.revenue)}<br>
+
+   Collection :
+   ${fmtINR(r.collection)}<br>
+
+   Outstanding :
+   ${fmtINR(r.outstanding)}<br>
+
+   Active :
+   ${r.active}<br>
+
+   Blocked :
+   ${r.blocked}<br>
+
+   Efficiency :
+   ${efficiency.toFixed(1)}%<br>
+
+   Health :
+   ${routeHealth(r)}
+
+ `;
+
+ document.getElementById(
+   'routeModal'
+ ).style.display='block';
+}
 function updateV10Dashboard(){
  try{
    const ord=getFilteredOrders();
@@ -2795,6 +2855,22 @@ function updateV10Dashboard(){
 
 document.addEventListener('DOMContentLoaded',()=>setTimeout(updateV10Dashboard,2000));
 </script>
+<div id="routeModal"
+     class="modal"
+     style="display:none">
 
+  <div class="modal-content">
+
+     <div id="routeDetail"></div>
+
+     <button onclick="
+      document.getElementById('routeModal').style.display='none'
+     ">
+      CLOSE
+     </button>
+
+  </div>
+
+</div>
 </body>
 </html>
