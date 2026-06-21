@@ -978,7 +978,23 @@ border:1px solid rgba(0,229,255,.12);
 </div>
   <!-- ── AGENTS LIST ── -->
   <div id="page-details" class="page">
+<div id="page-routeDetail" class="page">
 
+  <div class="panel">
+
+    <div class="panel-hd">
+
+      <div id="routeTitle"
+           class="panel-title">
+      </div>
+
+    </div>
+
+    <div id="routeDetailArea"></div>
+
+  </div>
+
+</div>
   <div class="panel">
 
      <div class="panel-hd">
@@ -1711,98 +1727,108 @@ function renderRouteSnapshot(){
 function openRouteTracker(route){
 
  const rt=buildRouteAnalytics();
+
  const r=rt[route];
 
  if(!r) return;
 
- const customersInRoute=
-   routeMaster.filter(x=>x.route===route);
+ document.getElementById(
+   'routeTitle'
+ ).textContent=
+   route + ' PERFORMANCE TRACKER';
 
- const html=`
+ const customersInRoute =
+   routeMaster.filter(x =>
+      (x.route||'')===route
+   );
 
- <div class="panel" style="margin-top:12px">
+ document.getElementById(
+   'routeDetailArea'
+ ).innerHTML = `
+
+ <div class="metrics-grid">
+
+   <div class="mc">
+     <div class="mc-lbl">REVENUE</div>
+     <div class="mc-val">
+       ${fmtINR(r.revenue)}
+     </div>
+   </div>
+
+   <div class="mc">
+     <div class="mc-lbl">COLLECTION</div>
+     <div class="mc-val">
+       ${fmtINR(r.collection)}
+     </div>
+   </div>
+
+   <div class="mc">
+     <div class="mc-lbl">OUTSTANDING</div>
+     <div class="mc-val">
+       ${fmtINR(r.outstanding)}
+     </div>
+   </div>
+
+   <div class="mc">
+     <div class="mc-lbl">ACTIVE</div>
+     <div class="mc-val">
+       ${r.active}
+     </div>
+   </div>
+
+   <div class="mc">
+     <div class="mc-lbl">BLOCKED</div>
+     <div class="mc-val">
+       ${r.blocked}
+     </div>
+   </div>
+
+ </div>
+
+ <div class="panel"
+      style="margin-top:12px">
 
    <div class="panel-hd">
+
       <div class="panel-title">
-         ${route} PERFORMANCE TRACKER
-      </div>
-   </div>
-
-   <div class="metrics-grid">
-
-      <div class="mc">
-         <div class="mc-lbl">REVENUE</div>
-         <div class="mc-val">${fmtINR(r.revenue)}</div>
-      </div>
-
-      <div class="mc">
-         <div class="mc-lbl">COLLECTION</div>
-         <div class="mc-val">${fmtINR(r.collection)}</div>
-      </div>
-
-      <div class="mc">
-         <div class="mc-lbl">OUTSTANDING</div>
-         <div class="mc-val">${fmtINR(r.outstanding)}</div>
-      </div>
-
-      <div class="mc">
-         <div class="mc-lbl">ACTIVE</div>
-         <div class="mc-val">${r.active}</div>
-      </div>
-
-      <div class="mc">
-         <div class="mc-lbl">BLOCKED</div>
-         <div class="mc-val">${r.blocked}</div>
+         CUSTOMERS IN ROUTE
       </div>
 
    </div>
 
-   <div style="
-      margin-top:15px;
-      font-weight:700;
-      font-size:14px;
-      letter-spacing:.08em;
-      color:var(--cyan)">
-      CUSTOMERS IN ROUTE (${customersInRoute.length})
-   </div>
+   ${customersInRoute.map(c=>`
 
-   <div style="margin-top:10px">
+     <div class="pl-item"
+          onclick="showDetailById('${c.customerId}')">
 
-      ${customersInRoute.map(c=>`
+        <div class="pl-main">
 
-      <div class="pl-item"
-           onclick="showDetailById('${c.customerId}')">
+           <div class="pl-name">
 
-          <div class="pl-main">
+             ${c.businessName}
 
-             <div class="pl-name">
-                ${c.customerName || c.customerId}
-             </div>
+           </div>
 
-             <div class="pl-sub">
+           <div class="pl-sub">
 
-                Balance :
-                ${fmtINR(c.balance||0)}
+             ${c.accountStatus}
 
-                |
+             ·
 
-                ${c.accountStatus}
+             ${fmtINR(c.balance)}
 
-             </div>
+           </div>
 
-          </div>
+        </div>
 
-      </div>
+     </div>
 
-      `).join('')}
-
-   </div>
+   `).join('')}
 
  </div>
  `;
 
- document.getElementById('routeTrackerDetail').innerHTML=html;
-
+ showPage('routeDetail');
 }
 /* ═══════ AGGREGATION ═══════ */
   function buildRouteAnalytics(){
